@@ -1,0 +1,29 @@
+[project]
+name = "clutchreel"
+version = "1.0.0"
+description = "Convierte demos de Counter-Strike 2 en vídeos de mejores jugadas listos para YouTube."
+requires-python = ">=3.11"
+
+[tool.ruff]
+line-length = 160
+target-version = "py311"
+extend-exclude = [".venv", "build", "dist", "tools"]
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "N", "S", "BLE", "RUF"]
+ignore = ["E501", "S101", "S110", "S311", "S603", "S607", "RUF001", "RUF002", "RUF003", "RUF012", "N802", "B008"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S", "BLE"]
+
+[tool.mypy]
+python_version = "3.11"
+ignore_missing_imports = true
+check_untyped_defs = true
+warn_unused_ignores = false
+no_implicit_optional = true
+exclude = ["\\.venv", "build", "dist", "tools"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

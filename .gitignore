@@ -1,0 +1,71 @@
+# --- Entorno y cachés ---
+.venv/
+venv/
+env/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+.idea/
+.vscode/
+*.swp
+Thumbs.db
+desktop.ini
+
+# --- Construcción (PyInstaller) ---
+dist/
+build/
+*.egg-info/
+
+# --- Herramientas descargadas por Iniciar.bat (FFmpeg ~90 MB) ---
+tools/
+
+# --- Registros ---
+logs/
+*.log
+
+# --- Demos, grabaciones y salidas de vídeo ---
+*.dem
+*.dem.info
+*.mkv
+*.mp4
+*.mov
+*.avi
+*.webm
+*.flv
+grabaciones/
+salidas/
+output/
+cache/
+proyectos/
+*.clutchreel.json
+# Música: el usuario pone sus pistas en assets/music (no se distribuye audio con licencia)
+assets/music/*
+!assets/music/LEEME.txt
+
+# --- Configuración de usuario y secretos ---
+config.json
+history.json
+cs2_cvars_backup.json
+client_secret*.json
+token*.json
+token*.pickle
+youtube_token.json
+*.pickle
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.pfx
+credentials*.json
+secrets*.json
+
+# --- Copias ---
+*.bak
+*.orig
+*.tmp
+*~

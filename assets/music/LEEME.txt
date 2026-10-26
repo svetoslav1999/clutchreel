@@ -1,0 +1,9 @@
+Pon aquí pistas de música libres de derechos (mp3, wav, ogg, flac, m4a).
+ClutchReel las ofrecerá en el asistente y en la pantalla de revisión junto a
+las de la carpeta de música que elijas en Ajustes → Rutas.
+
+Fuentes recomendadas de música libre para YouTube:
+- Biblioteca de audio de YouTube Studio (gratis, sin reclamaciones).
+- Pixabay Music, Free Music Archive (comprueba la licencia de cada pista).
+
+No se incluyen pistas en el paquete para no distribuir audio con licencia.
