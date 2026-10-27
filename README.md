@@ -138,6 +138,8 @@ Revisa el clip en la vista previa. Cada clip grabado lleva en su tarjeta de Revi
 - **YouTube**, **Modo automático**, **Apariencia** (tema oscuro/claro, bandeja).
 - Botones **Diagnóstico** (Python, FFmpeg, codificador, Steam, CS2, demos, OBS, WebSocket, jugador, disco, vista previa, con solución para cada fallo) y **Ver registro** → «Copiar informe de errores».
 
+Rendimiento: el análisis lee la demo en una sola pasada y guarda el resultado en `%APPDATA%\ClutchReel\cachenalisis` (volver a analizar la misma demo, aunque esté copiada en otra carpeta, es instantáneo). Al terminar de grabar, ClutchReel se pone delante de CS2: con CS2 en primer plano y la demo en pausa, el juego ocupa toda la GPU y la exportación iba hasta 15 veces más lenta.
+
 La configuración está en `%APPDATA%\ClutchReel\config.json`; los proyectos en `%APPDATA%\ClutchReel\proyectos`; el registro rotativo en `%APPDATA%\ClutchReel\logs\clutchreel.log`. Los vídeos salen en `Vídeos\ClutchReel` (grabaciones en bruto en `Vídeos\ClutchReel\grabaciones`).
 
 ---
