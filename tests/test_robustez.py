@@ -245,3 +245,34 @@ def test_obs_password_is_never_on_a_command_line() -> None:
     src = (Path(rec_mod.__file__).parent / "obs_client.py").read_text(encoding="utf-8")
     assert "--websocket_password" not in src
 
+
+
+def test_capture_cvar_is_applied_even_if_fresh_cs2_does_not_answer_in_time(tmp_path: Path) -> None:
+    """Recién abierto, CS2 no contestaba a tiempo la lectura de demo_ui_mode, la app la daba por inexistente
+    y la barra del reproductor salía en todos los clips. Las variables guardadas en la config del juego siguen
+    sin tocarse si no se puede leer su valor original."""
+
+    class SlowCs2(Cs2Controller):
+        def __init__(self) -> None:
+            super().__init__(Cs2Settings())
+            self.channel = "netcon"
+            self.sent: list[str] = []
+            self.reads: list[str] = []
+
+        @property
+        def can_read_console(self) -> bool:  # type: ignore[override]
+            return True
+
+        def get_cvar(self, name: str, attempts: int = 1) -> str | None:
+            self.reads.append(f"{name}x{attempts}")
+            return None  # ninguna lectura llega a tiempo
+
+        def send(self, commands) -> None:  # type: ignore[no-untyped-def]
+            self.sent.extend([commands] if isinstance(commands, str) else list(commands))
+
+    cs2 = SlowCs2()
+    cs2.backup_path = tmp_path / "backup.json"
+    cs2._backup_and_set([("demo_ui_mode", "0", False), ("engine_no_focus_sleep", "0", True)])
+    assert "demo_ui_mode 0" in cs2.sent
+    assert not any(c.startswith("engine_no_focus_sleep") for c in cs2.sent)
+    assert "demo_ui_modex3" in cs2.reads  # se reintenta antes de rendirse

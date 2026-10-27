@@ -440,9 +440,12 @@ class Cs2Controller:
                 return m
         return None
 
-    def get_cvar(self, name: str) -> str | None:
-        m = self.query(name, re.compile(rf"(?m)^{re.escape(name)} = (\S*)"), timeout=1.5)
-        return m.group(1) if m else None
+    def get_cvar(self, name: str, attempts: int = 1) -> str | None:
+        for _ in range(max(1, attempts)):
+            m = self.query(name, re.compile(rf"(?m)^{re.escape(name)} = (\S*)"), timeout=1.5)
+            if m:
+                return m.group(1)
+        return None
 
     def camera_position(self) -> tuple[float, float, float] | None:
         m = self.query("getpos", _GETPOS_RE, timeout=1.5)
@@ -513,11 +516,17 @@ class Cs2Controller:
         for name, value, archive in assignments:
             if self.can_read_console:
                 if name not in backup:
-                    current = self.get_cvar(name)
-                    if current is None:
-                        log.debug("Variable %s no disponible en esta versión de CS2", name)
+                    current = self.get_cvar(name, attempts=3)
+                    if current is not None:
+                        backup[name] = current
+                    elif archive:
+                        log.info("No se pudo leer %s; no se cambia (se guarda en la configuración del juego)", name)
                         continue
-                    backup[name] = current
+                    else:
+                        # Recién abierto, CS2 tarda en contestar y la lectura caduca. Antes se daba la variable
+                        # por inexistente y no se aplicaba (con demo_ui_mode, la barra del reproductor salía en
+                        # todos los clips). Las no guardadas vuelven a su valor por defecto al cerrar el juego.
+                        log.info("No se pudo leer %s; se aplica igualmente (no se guarda en la configuración del juego)", name)
             elif archive:
                 continue  # sin poder leer el original no se toca la configuración guardada del usuario
             cmds.append(f"{name} {value}")

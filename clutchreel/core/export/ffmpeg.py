@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
+import functools
 import json
 import logging
 import re
+import struct
 import subprocess
 import threading
 from collections.abc import Callable
@@ -275,6 +277,86 @@ def font_file_for(family: str) -> Path | None:
         if cand.exists():
             return cand
     return None
+
+
+@functools.lru_cache(maxsize=16)
+def font_codepoints(path: str) -> frozenset[int] | None:
+    """Caracteres con glifo en una fuente TrueType/OpenType (tabla ``cmap``); ``None`` si no se puede leer.
+
+    ``drawtext`` de FFmpeg no tiene fuentes de reserva: un carácter sin glifo sale como un cuadro vacío
+    (pasaba con nombres de jugador como «♛Nombre♛» en Segoe UI).
+    """
+    try:
+        data = Path(path).read_bytes()
+        num_tables = struct.unpack_from(">H", data, 4)[0]
+        cmap_off = None
+        for i in range(num_tables):
+            tag, _chk, off, _len = struct.unpack_from(">4sIII", data, 12 + 16 * i)
+            if tag == b"cmap":
+                cmap_off = off
+                break
+        if cmap_off is None:
+            return None
+        n_sub = struct.unpack_from(">H", data, cmap_off + 2)[0]
+        subtables: dict[tuple[int, int], int] = {}
+        for i in range(n_sub):
+            plat, enc, off = struct.unpack_from(">HHI", data, cmap_off + 4 + 8 * i)
+            subtables[(plat, enc)] = cmap_off + off
+        for key in ((3, 10), (0, 4), (3, 1), (0, 3)):
+            if key not in subtables:
+                continue
+            base = subtables[key]
+            fmt = struct.unpack_from(">H", data, base)[0]
+            cps: set[int] = set()
+            if fmt == 12:
+                n_groups = struct.unpack_from(">I", data, base + 12)[0]
+                for g in range(n_groups):
+                    start, end, glyph = struct.unpack_from(">III", data, base + 16 + 12 * g)
+                    cps.update(c for c in range(start, end + 1) if glyph + (c - start) != 0)
+                return frozenset(cps)
+            if fmt == 4:
+                seg_x2 = struct.unpack_from(">H", data, base + 6)[0]
+                ends = base + 14
+                starts = ends + seg_x2 + 2
+                deltas = starts + seg_x2
+                ranges = deltas + seg_x2
+                for s in range(seg_x2 // 2):
+                    end = struct.unpack_from(">H", data, ends + 2 * s)[0]
+                    start = struct.unpack_from(">H", data, starts + 2 * s)[0]
+                    delta = struct.unpack_from(">h", data, deltas + 2 * s)[0]
+                    roff = struct.unpack_from(">H", data, ranges + 2 * s)[0]
+                    for c in range(start, min(end, 0xFFFE) + 1):
+                        if roff == 0:
+                            glyph = (c + delta) & 0xFFFF
+                        else:
+                            glyph = struct.unpack_from(">H", data, ranges + 2 * s + roff + 2 * (c - start))[0]
+                            glyph = (glyph + delta) & 0xFFFF if glyph else 0
+                        if glyph:
+                            cps.add(c)
+                return frozenset(cps)
+    except (OSError, struct.error, IndexError) as exc:
+        log.debug("No se pudo leer la tabla de caracteres de %s: %s", path, exc)
+    return None
+
+
+def text_for_font(text: str, font: Path | None) -> str:
+    """Quita los caracteres que la fuente no puede dibujar (y los espacios que sobren)."""
+    if font is None:
+        return text
+    cps = font_codepoints(str(font))
+    if cps is None:
+        return text
+    kept = "".join(ch for ch in text if ch.isspace() or ord(ch) in cps)
+    if kept == text:
+        return text  # sin cambios: se respetan los espacios tal cual (p. ej. «KILLS  2»)
+    return re.sub(r"\s{2,}", " ", kept).strip()
+
+
+def fit_font_size(text: str, size: int, max_width: float, char_em: float = 0.56) -> int:
+    """Reduce el tamaño para que el texto quepa en ``max_width`` px (ancho medio de carácter ≈ 0,56 em en negrita)."""
+    if not text:
+        return size
+    return max(14, min(size, int(max_width / (char_em * len(text)))))
 
 
 def escape_drawtext(text: str) -> str:

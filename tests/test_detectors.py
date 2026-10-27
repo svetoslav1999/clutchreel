@@ -127,3 +127,37 @@ def test_halftime_side_switch_uses_per_round_lineup(match):  # type: ignore[no-u
     # Y con la alineación de la primera mitad (yo CT) la misma ronda NO sería un clutch ganado.
     r13.players_at_start = dict(match.rounds[0].players_at_start)
     assert not [h for h in detect_clutches(ctx(match)) if h.round == 13 and h.extra.get("won")]
+
+
+def test_overtime_rounds_are_decisive_and_use_their_own_side(match):  # type: ignore[no-untyped-def]
+    """Prórroga (MR3 tras 12-12): rondas > 24 con cambio de bando a mitad de la prórroga."""
+    from clutchreel.core.demo.detectors import _is_decisive_round, detect_all
+    from clutchreel.core.demo.models import TEAM_CT, TEAM_T, RoundInfo
+    from clutchreel.services.config import DetectionSettings, ScoringWeights
+    from tests.conftest import ENEMIES, MATES, kill
+
+    ct_side = {ME: TEAM_CT, **{m: TEAM_CT for m in MATES}, **{e: TEAM_T for e in ENEMIES}}
+    t_side = {ME: TEAM_T, **{m: TEAM_T for m in MATES}, **{e: TEAM_CT for e in ENEMIES}}
+    # 12-12 → prórroga: rondas 25-27 en un bando y 28 en el otro (el marcador sigue acumulando).
+    r25 = RoundInfo(25, 200000, 201000, 207000, TEAM_CT, ct_score_after=13, t_score_after=12, players_at_start=ct_side)
+    r28 = RoundInfo(28, 230000, 231000, 237000, TEAM_T, ct_score_after=14, t_score_after=14, players_at_start=t_side)
+    match.rounds += [r25, r28]
+    match.kills += [
+        kill(202000, 25, ME, ENEMIES[0], headshot=True),
+        kill(202300, 25, ME, ENEMIES[1], headshot=True),
+        kill(202600, 25, ME, ENEMIES[2]),
+        kill(232000, 28, ME, ENEMIES[0]),
+        kill(232200, 28, ME, ENEMIES[1]),
+    ]
+    for k in match.kills:
+        if k.round == 28:
+            k.attacker_team = t_side.get(k.attacker_steamid, 0)
+            k.victim_team = t_side.get(k.victim_steamid, 0)
+    assert _is_decisive_round(match, r25) and _is_decisive_round(match, r28)
+    found = detect_all(match, ME, DetectionSettings(), ScoringWeights())
+    ot = {h.round: h for h in found if h.round >= 25}
+    assert set(ot) == {25, 28}
+    assert "3k" in (ot[25].merged_kinds or [ot[25].kind]) and "decisive" in (ot[25].merged_kinds or [ot[25].kind])
+    # La ronda 28 la gana T, que en esa mitad de la prórroga es MI bando: cuenta como decisiva ganada.
+    assert "decisive" in (ot[28].merged_kinds or [ot[28].kind])
+    assert all(r25.start_tick <= h.start_tick and h.end_tick <= r28.end_tick + 64 * 5 for h in ot.values())

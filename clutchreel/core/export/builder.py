@@ -15,7 +15,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from clutchreel.core.export.ffmpeg import escape_drawtext, escape_filter_path, font_file_for
+from clutchreel.core.export.ffmpeg import escape_drawtext, escape_filter_path, fit_font_size, font_file_for, text_for_font
 
 PRESETS: dict[str, dict[str, object]] = {
     "youtube_1080p60": {"label": "YouTube 1080p60", "width": 1920, "height": 1080, "fps": 60, "aspect": "16:9"},
@@ -117,6 +117,7 @@ class ClipRenderSpec:
 
 
 def _drawtext(text: str, font: Path | None, size: int, color: str, x: str, y: str, enable: str | None = None, box: bool = True) -> str:
+    text = text_for_font(text, font)
     parts = [f"text='{escape_drawtext(text)}'", f"fontsize={size}", f"fontcolor={color}", f"x={x}", f"y={y}"]
     if font:
         parts.append(f"fontfile='{escape_filter_path(font)}'")
@@ -174,19 +175,30 @@ def clip_command(spec: ClipRenderSpec, enc: EncodeSettings) -> list[str]:
 
     out_dur = spec.output_duration()
     overlays: list[str] = []
+    # Los tamaños están pensados para 1080 px de lado corto; se escalan con la resolución y se reducen si el
+    # texto no cabe (en vertical 9:16 solo hay 1080 px de ancho: antes el título se salía por los lados).
+    scale = min(enc.width, enc.height) / 1080.0
+    top_band = 0
     for ov in spec.overlays:
-        y = {"top": "60", "bottom": "h-th-80", "center": "(h-th)/2"}.get(ov.position, "60")
+        text = text_for_font(ov.text, font)
+        size = fit_font_size(text, round(ov.size * scale), enc.width * 0.9)
+        top_y = round(60 * scale)
+        y = {"top": str(top_y), "bottom": "h-th-80", "center": "(h-th)/2"}.get(ov.position, str(top_y))
+        if ov.position == "top":
+            top_band = max(top_band, top_y + size + 28)
         enable = None
         if ov.start > 0 or ov.end > 0:
             end = ov.end if ov.end > 0 else out_dur + 1
             enable = f"between(t,{ov.start:.2f},{end:.2f})"
-        overlays.append(_drawtext(ov.text, font, ov.size, ov.color, "(w-tw)/2", y, enable))
+        overlays.append(_drawtext(text, font, size, ov.color, "(w-tw)/2", y, enable))
     if spec.kill_counter and spec.kill_times:
         times = sorted(t for t in spec.kill_times if 0 <= t <= out_dur + 0.5)
+        # En vertical el título ocupa todo el ancho: el marcador va debajo, no encima de él.
+        counter_y = str(top_band + 12) if enc.aspect == "9:16" and top_band else str(round(40 * scale))
         for idx, t in enumerate(times):
             nxt = times[idx + 1] if idx + 1 < len(times) else out_dur + 1
             label = f"KILLS  {idx + 1}"
-            overlays.append(_drawtext(label, font, 40, "white", "w-tw-40", "40", f"between(t,{t:.2f},{nxt:.2f})"))
+            overlays.append(_drawtext(label, font, round(40 * scale), "white", "w-tw-40", counter_y, f"between(t,{t:.2f},{nxt:.2f})"))
     fades: list[str] = []
     if spec.fade_in > 0:
         fades.append(f"fade=t=in:st=0:d={spec.fade_in:.2f}")
@@ -230,8 +242,11 @@ def card_command(
         "-i",
         "anullsrc=channel_layout=stereo:sample_rate=48000",
     ]
-    title_size = int(enc.height * 0.085)
-    sub_size = int(enc.height * 0.04)
+    short_side = min(enc.width, enc.height)  # en vertical manda el ancho (antes el título se salía)
+    title = text_for_font(title, font)
+    subtitle = text_for_font(subtitle, font)
+    title_size = fit_font_size(title, int(short_side * 0.085), enc.width * 0.9)
+    sub_size = fit_font_size(subtitle, int(short_side * 0.04), enc.width * 0.9)
     chain: list[str] = []
     if logo and logo.exists():
         args += ["-i", str(logo)]

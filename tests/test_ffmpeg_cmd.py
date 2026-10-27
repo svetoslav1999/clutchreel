@@ -103,3 +103,52 @@ def test_thumbnail_title_is_only_the_main_play() -> None:
     merged = Highlight("ace", 6, 0, 100, 1.0, "x", merged_kinds=["ace", "entry", "smoke", "noscope"])
     assert thumbnail_title(merged) == "ACE"  # «ACE + PRIMERA BAJA + A TRAVÉS DE HUMO + NO-SCOPE» no cabe en 1280 px
     assert thumbnail_title(Highlight("clutch", 2, 0, 100, 1.0, "x")) == "Clutch"
+
+
+def test_vertical_texts_fit_and_counter_goes_below_title(tmp_path: Path) -> None:
+    """En 9:16 (1080 px de ancho) el título largo se salía y el marcador de kills se montaba encima."""
+    import re
+
+    from clutchreel.core.export.builder import ClipRenderSpec, TextOverlay, clip_command, encode_settings_for
+
+    enc = encode_settings_for("shorts_1080x1920", "libx264", "alta")
+    title = "ACE + Primera baja + A través de humo + No-scope · Ronda 6"
+    spec = ClipRenderSpec(tmp_path / "a.mkv", tmp_path / "o.mp4", 0.0, 10.0, overlays=[TextOverlay(title, 0.3, 3.5, "top", 44)], kill_times=[1.0], kill_counter=True)
+    fc = clip_command(spec, enc)[clip_command(spec, enc).index("-filter_complex") + 1]
+    sizes = [int(s) for s in re.findall(r"fontsize=(\d+)", fc)]
+    title_size, counter_size = sizes[0], sizes[1]
+    assert title_size * 0.56 * len(title) <= 1080 * 0.9 + 1
+    counter_y = int(re.search(r"KILLS  1':fontsize=\d+:fontcolor=white:x=w-tw-40:y=(\d+)", fc).group(1))  # type: ignore[union-attr]
+    assert counter_y >= 60 + title_size  # debajo del título
+    # En 16:9 el título cabe tal cual y el marcador sigue arriba a la derecha.
+    enc169 = encode_settings_for("youtube_1080p60", "libx264", "alta")
+    fc169 = clip_command(spec, enc169)[clip_command(spec, enc169).index("-filter_complex") + 1]
+    assert "fontsize=44" in fc169 and "x=w-tw-40:y=40:" in fc169
+    assert counter_size == 40
+
+
+def test_card_title_fits_vertical_and_drops_missing_glyphs(tmp_path: Path) -> None:
+    import re
+
+    from clutchreel.core.export.builder import card_command, encode_settings_for
+    from clutchreel.core.export.ffmpeg import font_file_for
+
+    enc = encode_settings_for("shorts_1080x1920", "libx264", "alta")
+    args = card_command(tmp_path / "i.mp4", enc, "♛JUGADOR CON NOMBRE LARGO♛ · Mirage", "Highlights Premier · CT 13 – 10 T")
+    fc = args[args.index("-filter_complex") + 1]
+    size = int(re.findall(r"fontsize=(\d+)", fc)[0])
+    assert size * 0.56 * len("JUGADOR CON NOMBRE LARGO · Mirage") <= 1080 * 0.9 + 1
+    if font_file_for("Segoe UI") is not None:  # Segoe UI no tiene «♛»: saldría un cuadro vacío
+        assert "♛" not in fc and "JUGADOR CON NOMBRE LARGO" in fc
+
+
+def test_font_codepoints_reads_real_font() -> None:
+    from clutchreel.core.export.ffmpeg import font_codepoints, font_file_for, text_for_font
+
+    font = font_file_for("Segoe UI")
+    if font is None:
+        return
+    cps = font_codepoints(str(font))
+    assert cps is not None and ord("ñ") in cps and ord("A") in cps
+    assert text_for_font("♛Niño ñandú♛", font) == "Niño ñandú"
+    assert text_for_font("sin fuente", None) == "sin fuente"
