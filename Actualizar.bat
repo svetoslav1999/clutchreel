@@ -27,10 +27,10 @@ if not exist ".git" (
 
 rem ---------- 1) Cambios locales: nunca se descartan ----------
 set "DIRTY="
-for /f "delims=" %%L in ('git status --porcelain --untracked-files=no') do set "DIRTY=1"
+for /f "delims=" %%L in ('git status --porcelain -uno') do set "DIRTY=1"
 if defined DIRTY (
     echo [!] Tienes cambios sin guardar en archivos de ClutchReel:
-    git status --short --untracked-files=no
+    git status --short -uno
     echo.
     echo     No se ha tocado nada. Para conservarlos, guardalos aparte y vuelve a ejecutar Actualizar.bat:
     echo         git stash push -m "mis cambios"
