@@ -6,6 +6,29 @@ Convierte demos de **Counter-Strike 2** (partidas Premier/Competitivo) en vídeo
 
 ---
 
+## Avisos
+
+**Proyecto independiente.** ClutchReel no está afiliado, patrocinado ni aprobado por Valve Corporation ni por el proyecto OBS Studio. Counter-Strike, Counter-Strike 2 y Steam son marcas de Valve Corporation; OBS y OBS Studio pertenecen a sus respectivos titulares. Los nombres se usan solo para indicar con qué programas funciona.
+
+**Sin garantías.** El software se ofrece «tal cual», sin garantía de ningún tipo, expresa o implícita. Úsalo bajo tu responsabilidad; los autores no responden de daños, pérdidas de datos ni de las consecuencias de su uso (ver `LICENSE`).
+
+**Qué hace ClutchReel con el juego**
+
+- Lee los ficheros `.dem` del disco (solo lectura) con la librería demoparser2.
+- Abre CS2 a través de Steam con `-insecure` (sin VAC; el juego no puede entrar en partidas oficiales mientras está así) y `-netconport`, y reproduce la demo en el **visor oficial de demos** del juego.
+- Le envía **comandos de consola normales** del visor (`playdemo`, `demo_gototick`, `demo_step_tick`, `demo_pause`, `spec_player`, `spec_mode`, `getpos`…) por el puerto de consola local o, como respaldo, tecleándolos.
+- Cambia temporalmente algunas variables de interfaz para grabar limpio (FPS en pantalla, aviso de TrueView, sonido sin foco…) y las **restaura** al terminar.
+- Graba la pantalla con OBS a través de obs-websocket.
+
+**Qué NO hace**
+
+- No inyecta código, no lee ni escribe la memoria del juego, no usa DLL, hooks ni overlays propios.
+- No modifica ni parchea ficheros del juego. Lo único que puede escribir en la carpeta de CS2 es `cfg/clutchreel.cfg` (con esos mismos comandos de consola) si activas el modo de respaldo por teclado, y una copia de la demo en `replays` si activas esa opción.
+- No se conecta a servidores de partidas ni funciona en partidas online: solo con demos ya descargadas.
+- No envía datos a ningún sitio salvo, si tú la activas, la subida a YouTube con tus credenciales.
+
+---
+
 ## Requisitos
 
 | Qué | Para qué | Dónde |
