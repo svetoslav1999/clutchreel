@@ -199,4 +199,8 @@ Para cualquier error: `Ajustes → Ver registro → Copiar informe de errores`.
 .venv\Scripts\python -m mypy clutchreel # tipos
 ```
 
-Estructura: `clutchreel/ui` (PySide6), `core/demo` (demoparser2, detectores, puntuación, selección), `core/recorder` (OBS + CS2), `core/editor` (proyecto, deshacer, música), `core/export` (FFmpeg, miniatura, metadatos), `services` (configuración, historial, vigilante, YouTube, diagnóstico), `utils`. Más detalle en `docs/ARQUITECTURA.md`.
+Estructura: `clutchreel/ui` (PySide6), `core/demo` (demoparser2, detectores, puntuación, selección), `core/recorder` (OBS mediante un cliente propio del protocolo obs-websocket 5 sobre `websocket-client` + consola de CS2), `core/editor` (proyecto, deshacer, música), `core/export` (FFmpeg, miniatura, metadatos), `services` (configuración, historial, vigilante, YouTube, diagnóstico), `utils`. Más detalle en `docs/ARQUITECTURA.md`.
+
+## Licencia
+
+ClutchReel es software libre bajo la **licencia MIT** (ver `LICENSE`). Las bibliotecas de terceros que usa y sus licencias están en `THIRD_PARTY_NOTICES.md`; destaca Qt/PySide6 (LGPL-3.0, enlazado dinámicamente y distribuido como carpeta para que puedas sustituirlo). FFmpeg, OBS Studio y Counter-Strike 2 no se distribuyen con ClutchReel.

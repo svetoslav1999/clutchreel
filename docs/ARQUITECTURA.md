@@ -15,7 +15,7 @@ Iniciar.bat ──► scripts/obtener_ffmpeg.py ──► python -m clutchreel
                                                     │
         ┌───────────────────────┬───────────────────┼─────────────────────┬──────────────────┐
    core/demo              core/recorder         core/editor           core/export         services
-   parser.py (demoparser2) obs_client.py        project.py (Clip,     ffmpeg.py (run,     config.py (JSON %APPDATA%)
+   parser.py (demoparser2) obs_client.py (obsws) project.py (Clip,     ffmpeg.py (run,     config.py (JSON %APPDATA%)
    detectors.py (jugadas)  cs2_control.py       Project, UndoStack)   probe, HW)          history.py
    selector.py (duración)  recorder.py          music.py (beats)      builder.py (cmds)   watcher.py (carpeta demos)
    stats.py (K/D, ADR…)    win_input.py                               exporter.py         youtube.py (OAuth)
