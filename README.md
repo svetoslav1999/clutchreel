@@ -203,4 +203,4 @@ Estructura: `clutchreel/ui` (PySide6), `core/demo` (demoparser2, detectores, pun
 
 ## Licencia
 
-ClutchReel es software libre bajo la **licencia MIT** (ver `LICENSE`). Las bibliotecas de terceros que usa y sus licencias están en `THIRD_PARTY_NOTICES.md`; destaca Qt/PySide6 (LGPL-3.0, enlazado dinámicamente y distribuido como carpeta para que puedas sustituirlo). FFmpeg, OBS Studio y Counter-Strike 2 no se distribuyen con ClutchReel.
+ClutchReel es software libre bajo la **licencia MIT** (ver `LICENSE`). Copyright © 2026 Svetoslav. Las bibliotecas de terceros que usa y sus licencias están en `THIRD_PARTY_NOTICES.md`; destaca Qt/PySide6 (LGPL-3.0, enlazado dinámicamente y distribuido como carpeta para que puedas sustituirlo). FFmpeg, OBS Studio y Counter-Strike 2 no se distribuyen con ClutchReel.

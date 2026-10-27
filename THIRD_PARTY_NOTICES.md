@@ -1,6 +1,6 @@
 # Avisos de software de terceros
 
-ClutchReel se distribuye bajo la licencia MIT (ver `LICENSE`). Usa las bibliotecas y programas
+ClutchReel (Copyright © 2026 Svetoslav) se distribuye bajo la licencia MIT (ver `LICENSE`). Usa las bibliotecas y programas
 que se listan aquí, cada uno con su propia licencia. Los textos completos están en la distribución
 de cada paquete (carpeta `*.dist-info/licenses` dentro de `.venv` o de `dist\ClutchReel`) y en los
 enlaces indicados. Inventario revisado el 2026-10-27 con las versiones fijadas en `requirements.txt`
