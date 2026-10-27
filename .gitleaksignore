@@ -1,0 +1,4 @@
+# Falsos positivos revisados a mano: contraseñas ficticias de los tests (no son de ningún OBS real).
+32f244a94e2849d97757fbf669c5335add6af0e9:tests/test_actualizacion.py:generic-api-key:30
+32f244a94e2849d97757fbf669c5335add6af0e9:tests/data/config_1_0_0.json:generic-api-key:20
+8bb7aded76d5163ba2804c836c8d99780139905c:tests/test_obsws.py:generic-api-key:351
