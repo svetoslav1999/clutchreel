@@ -298,7 +298,7 @@ def test_existing_recording_reports_plays_outside_the_video(match, tmp_path: Pat
     p.existing_recording = str(video)
     p.export_preset = "youtube_1080p60"
     cfg = AppConfig()
-    cfg.paths.output_folder = str(tmp_path / "salida")
+    cfg.paths.output_folder = str(tmp_path / "Vídeos ñ áé con espacios")
     cfg.export.hw_accel = "cpu"
     cfg.export.thumbnail = False
     cfg.export.loudnorm = False
@@ -307,3 +307,15 @@ def test_existing_recording_reports_plays_outside_the_video(match, tmp_path: Pat
     p.clips = p.clips[1:]
     with pytest.raises(ExportError, match="desfase"):
         Exporter(cfg, ff).export(p)
+
+
+def test_cancelled_clip_is_not_marked_as_failed(project, tmp_path, monkeypatch):  # type: ignore[no-untyped-def]  # noqa: F811
+    """Tras cancelar, la tarjeta del clip quedaba en rojo con «falló: Grabación cancelada»."""
+    from clutchreel.ui.widgets.clip_card import recording_status
+
+    r, _obs, cs2 = make_recorder(tmp_path, monkeypatch)
+    project.clips = project.clips[:1]
+    cs2.play_ticks = lambda ticks: r.cancel.set()  # type: ignore[method-assign]
+    with pytest.raises(RecorderError, match="cancelada"):
+        r.record_project(project, lambda m, f: None)
+    assert recording_status(project.clips[0])[0] == "○ sin grabar"

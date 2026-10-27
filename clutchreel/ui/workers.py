@@ -57,7 +57,10 @@ class Worker(QThread):
         try:
             result = self.fn(*self.args, progress=self._progress, cancel=self.cancel_event, **self.kwargs)
         except Exception as exc:
-            log.exception("Tarea %s falló", self.objectName())
+            if self.cancel_event.is_set() and "cancel" in str(exc).lower():
+                log.info("Tarea %s cancelada", self.objectName())  # no es un error: sin traza en el registro
+            else:
+                log.exception("Tarea %s falló", self.objectName())
             self.failed.emit(str(exc) or exc.__class__.__name__, traceback.format_exc())
             return
         self.finished_ok.emit(result)

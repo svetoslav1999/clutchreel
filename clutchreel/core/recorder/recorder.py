@@ -269,12 +269,14 @@ class Recorder:
                         self._record_clip(project, job, player, plans[job.clip.id], status, base, 0.86 / total)
                         break
                     except (Cs2Error, ObsError, RecorderError, SpectateError) as exc:
+                        if self.cancel.is_set():
+                            # Cancelado por el usuario: el clip no ha fallado (su tarjeta no debe quedar en rojo).
+                            log.info("Grabación cancelada durante el clip %s", job.clip.id)
+                            raise RecorderError("Grabación cancelada.") from exc
                         job.error = explain_failure(exc, channel)
                         job.clip.recording_ok = False
                         job.clip.camera_note = job.error
                         log.warning("Clip %s falló (intento %d): %s", job.clip.id, job.attempts, exc)
-                        if self.cancel.is_set():
-                            raise RecorderError("Grabación cancelada.") from exc
                         if self.cs2.is_running() and not self.cs2.responsive(timeout=5.0):
                             # Colgado: reintentar los demás clips solo alargaría la espera. No se cierra sin permiso.
                             raise RecorderError(

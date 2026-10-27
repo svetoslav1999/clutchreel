@@ -98,11 +98,11 @@ Para actualizar más adelante: `git pull` en la carpeta y vuelve a abrir `Inicia
 
 1. **Inicio**: arrastra una o varias demos a la zona grande (o elige de la lista «Demos en tu carpeta de CS2»). Se analizan con barra de progreso: mapa, fecha, marcador, jugadores y estadísticas.
 2. **Asistente** (5 pasos, botón «✨ Usar recomendado y terminar»):
-   1. jugador (se detecta tu cuenta de Steam; se recuerda para la próxima vez);
+   1. jugador (se detecta tu cuenta de Steam; se recuerda para la próxima vez). Si tu cuenta no aparece en la demo no se preselecciona a nadie: elige tu jugador en la lista;
    2. qué sacar: multikills (2K/3K/4K/ACE), clutches 1vX, rachas de headshots, primeras bajas, AWP/no-scope, wallbangs, kills a través de humo, cegado, en el aire, cuchillo, rondas decisivas, mejor ronda o todas las kills;
    3. duración objetivo (1-3, 3-5, 5-10 min o sin límite): se eligen las mejores por puntuación;
    4. estilo: formato (YouTube 1080p/1440p/4K o Shorts 9:16), música, transiciones, intro/outro, marcador de kills, cámara lenta, nombre del canal;
-   5. grabación: automática con OBS o vídeo ya grabado.
+   5. grabación: automática con OBS o vídeo ya grabado (hay que elegir el vídeo; si alguna jugada cae fuera de él, al exportar se avisa de cuáles se omitieron).
 3. **Revisión**: tarjetas de las jugadas (tipo, ronda, puntuación, duración). Arrastra para reordenar, casilla para incluir/excluir, recorta inicio/fin, cámara lenta, texto, zoom, transición y volumen por clip; música con ducking, intro/outro, logo; «Ordenar por: cronológico / mejor puntuación / crescendo»; deshacer/rehacer (Ctrl+Z / Ctrl+Y); guardar perfil. Todo se autoguarda en un proyecto `.clutchreel.json`.
 4. **🎬 Crear vídeo**: si faltan grabaciones, ClutchReel abre OBS y CS2, reproduce la demo y graba cada jugada; después monta y exporta. En «Cola y resultado» ves el progreso, la estimación de tiempo, y al terminar: abrir carpeta, previsualizar, título/descripción/etiquetas sugeridos (editables) y «Subir a YouTube (privado)».
 5. **Modo TODO AUTOMÁTICO** (casilla en Inicio o icono de la bandeja): vigila la carpeta de demos de CS2 y, cuando aparece una nueva, la procesa con el perfil guardado y avisa con una notificación de Windows.
@@ -132,7 +132,7 @@ Revisa el clip en la vista previa. Cada clip grabado lleva en su tarjeta de Revi
 
 - **Jugador**: SteamID64 y nombre (se rellena desde las cuentas de Steam del PC).
 - **Rutas**: demos, salida, FFmpeg, OBS, CS2, música. Vacío = detección automática.
-- **OBS**: host/puerto/contraseña (se leen de la configuración de obs-websocket; nunca se escriben en el registro ni se pasan por línea de comandos), modo de captura, formato (solo se cambia si el de OBS no sirve), resolución y FPS. ClutchReel toca en OBS únicamente: la escena/fuente «ClutchReel», la carpeta de grabación y, si está marcado «Fijar resolución y FPS», el lienzo.
+- **OBS**: host/puerto/contraseña (se leen de la configuración de obs-websocket; nunca se pasan por línea de comandos y el registro tacha cualquier contraseña, también la que imprime la librería obs-websocket al conectar), modo de captura, formato (solo se cambia si el de OBS no sirve), resolución y FPS. ClutchReel toca en OBS únicamente: la escena/fuente «ClutchReel», la carpeta de grabación y, si está marcado «Fijar resolución y FPS», el lienzo.
 - **CS2**: opciones de lanzamiento, puerto de consola, `-tools` (desactivado), comandos de HUD, esperas, latencia, ventana forzada, respaldos.
 - **Calidad y detección**: preset, códec H.264/HEVC, NVENC/AMF/QSV/CPU, bitrate, loudnorm, miniatura, abrir carpeta/notificar/apagar al terminar, márgenes antes/después de cada jugada, ventana de multikill, fusión de jugadas cercanas.
 - **YouTube**, **Modo automático**, **Apariencia** (tema oscuro/claro, bandeja).
@@ -171,6 +171,8 @@ Pon pistas en una carpeta y elígela en `Ajustes → Rutas → Música` (o en `a
 | «El puerto de consola 2121 no respondió» | CS2 estaba abierto sin `-netconport` (ClutchReel pide permiso para reiniciarlo) o un cortafuegos bloquea el puerto local | acepta el reinicio de CS2 desde ClutchReel, o ciérralo antes de pulsar «Crear vídeo». Sin puerto se usa el teclado, pero los clips no se pueden comprobar y se marcan como fallidos. |
 | Un clip aparece como «✗ falló: la cámara no sigue a…» | CS2 cambió la cámara a otro jugador (p. ej. tu jugador murió) o el comando `spec_player` no llegó | vuelve a pulsar «Crear vídeo»: solo se reintentan los clips fallidos. Si se repite, copia el registro (Ajustes → Ver registro). |
 | Las grabaciones tienen extensión `.mkv` pero son MP4 | OBS cambia la extensión al vuelo pero sigue con el formato anterior hasta reiniciarse | ClutchReel renombra cada grabación según su contenido real; no hace falta hacer nada. |
+| Se ve la barra del reproductor de demos en el vídeo | versiones anteriores de ClutchReel no siempre aplicaban `demo_ui_mode 0` cuando abrían CS2 ellas mismas | ya está corregido; si la ves, cierra CS2 y vuelve a pulsar «Crear vídeo». |
+| He pulsado «Cancelar» o he cerrado la app grabando | — | ClutchReel para la grabación de OBS, borra el clip a medias y devuelve las variables de CS2 a su valor. Los clips ya grabados se conservan. |
 | El clip empieza tarde/pronto | latencia distinta de la calibrada | repite «Probar grabación» o ajusta «Ajuste manual de inicio (s)». |
 | «playdemo» no encuentra la demo | CS2 no acepta la ruta absoluta | activa «Copiar la demo a la carpeta replays del juego». |
 | «No hay espacio suficiente» | menos de 2 GB libres | libera espacio o cambia la carpeta de salida. |
