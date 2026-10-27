@@ -11,7 +11,7 @@ from collections.abc import Callable
 from dataclasses import dataclass, field
 from pathlib import Path
 
-from clutchreel.core.demo.models import KIND_LABELS, Highlight
+from clutchreel.core.demo.models import Highlight
 from clutchreel.core.editor.music import detect_beats, pick_track
 from clutchreel.core.editor.project import Clip, Project
 from clutchreel.core.export import builder as b
@@ -68,7 +68,7 @@ def _clip_source(project: Project, clip: Clip) -> tuple[Path, float] | None:
 def thumbnail_title(hl: Highlight) -> str:
     """Título corto para la miniatura: solo la jugada principal (la lista de tipos fusionados no cabe)."""
     kinds = hl.merged_kinds or [hl.kind]
-    return KIND_LABELS.get(kinds[0], kinds[0])
+    return hl.kind_label(kinds[0])
 
 
 def _overlay_for(clip: Clip, hl: Highlight, project: Project) -> list[b.TextOverlay]:

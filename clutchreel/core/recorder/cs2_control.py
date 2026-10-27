@@ -65,6 +65,11 @@ CAPTURE_CVARS: dict[str, tuple[str, bool]] = {
     "snd_mute_losefocus": ("0", True),  # sin foco CS2 se silencia → clips sin audio
 }
 
+# Valor por defecto de CS2 (1.41.9) de las variables no guardadas que se cambian para grabar. Si no se pudo
+# leer el valor original (CS2 recién abierto no contesta a tiempo), se restaura este al terminar; sin él,
+# demo_ui_mode se quedaba a 0 y la barra del reproductor no volvía hasta reiniciar el juego.
+CVAR_DEFAULTS: dict[str, str] = {"demo_ui_mode": "1"}
+
 # Solo la *entrada* en partida: «INGAME -> MAINMENU» sale al descargar la demo anterior y no vale.
 _LOADED_RE = re.compile(r"-> CSGO_GAME_UI_STATE_INGAME|Host activate: Playing Demo|OnSwitchLoopModeFinished\( game : success \)")
 # Al descargar la demo anterior (playdemo con otra ya abierta).
@@ -526,7 +531,12 @@ class Cs2Controller:
                         # Recién abierto, CS2 tarda en contestar y la lectura caduca. Antes se daba la variable
                         # por inexistente y no se aplicaba (con demo_ui_mode, la barra del reproductor salía en
                         # todos los clips). Las no guardadas vuelven a su valor por defecto al cerrar el juego.
-                        log.info("No se pudo leer %s; se aplica igualmente (no se guarda en la configuración del juego)", name)
+                        default = CVAR_DEFAULTS.get(name)
+                        if default is not None:
+                            backup[name] = default
+                            log.info("No se pudo leer %s; se aplica igualmente y al terminar se restaurará su valor por defecto (%s)", name, default)
+                        else:
+                            log.info("No se pudo leer %s; se aplica igualmente (no se guarda en la configuración del juego)", name)
             elif archive:
                 continue  # sin poder leer el original no se toca la configuración guardada del usuario
             cmds.append(f"{name} {value}")

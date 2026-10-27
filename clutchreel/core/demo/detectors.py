@@ -198,7 +198,9 @@ def detect_multikills(ctx: DetectionContext) -> list[Highlight]:
             desc = f"{n}K en la ronda {rnd} con {weapon_label(g[-1].weapon)}"
             if hs:
                 desc += f" ({hs} HS)"
-            out.append(_mk_highlight(ctx, kind, g, score, desc, [f"{n}K"]))
+            hl = _mk_highlight(ctx, kind, g, score, desc, [f"{n}K"])
+            hl.extra["kills"] = n  # la etiqueta muestra «5K» aunque el tipo sea «4k» (ACE desactivado)
+            out.append(hl)
     return out
 
 

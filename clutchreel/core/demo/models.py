@@ -142,10 +142,18 @@ class Highlight:
     def start_seconds(self, tickrate: float) -> float:
         return ticks_to_seconds(self.start_tick, tickrate)
 
+    def kind_label(self, kind: str) -> str:
+        """Texto de un tipo. Con ACE desactivado, 5 o más kills quedan como «4k» pero se muestran por su número («5K»)."""
+        if kind == "4k":
+            n = int(self.extra.get("kills", 0) or 0)
+            if n >= 5:
+                return f"{n}K"
+        return KIND_LABELS.get(kind, kind)
+
     @property
     def label(self) -> str:
         kinds = self.merged_kinds or [self.kind]
-        return " + ".join(KIND_LABELS.get(k, k) for k in kinds)
+        return " + ".join(self.kind_label(k) for k in kinds)
 
     def to_dict(self) -> dict[str, Any]:
         data = asdict(self)

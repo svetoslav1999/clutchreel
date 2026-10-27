@@ -161,3 +161,27 @@ def test_overtime_rounds_are_decisive_and_use_their_own_side(match):  # type: ig
     # La ronda 28 la gana T, que en esa mitad de la prórroga es MI bando: cuenta como decisiva ganada.
     assert "decisive" in (ot[28].merged_kinds or [ot[28].kind])
     assert all(r25.start_tick <= h.start_tick and h.end_tick <= r28.end_tick + 64 * 5 for h in ot.values())
+
+
+def test_five_kills_without_ace_enabled_are_labelled_5k_everywhere():  # type: ignore[no-untyped-def]
+    """Con ACE desactivado, 5 kills seguidas quedaban con la etiqueta «4K» pero la descripción decía «5K»."""
+    from clutchreel.core.demo.models import TEAM_CT, MatchData, PlayerInfo
+    from clutchreel.core.export.exporter import thumbnail_title
+    from tests.conftest import ENEMIES, MATES, kill, make_round
+
+    rounds = [make_round(1, 0, TEAM_CT)]
+    players = [PlayerInfo(ME, "yo", TEAM_CT, user_id=3)] + [PlayerInfo(m, f"mate{m % 10}", TEAM_CT) for m in MATES] + [PlayerInfo(e, f"enemy{e % 10}", 2) for e in ENEMIES]
+    kills = [kill(1500 + i * 200, 1, ME, e) for i, e in enumerate(ENEMIES)]
+    match = MatchData(demo_path="synthetic.dem", map_name="de_test", tickrate=TICKRATE, total_ticks=8000, players=players, kills=kills, rounds=rounds)
+    kinds = [k for k in DetectionSettings().enabled_kinds if k != "ace"]
+    found = detect_all(match, ME, DetectionSettings(enabled_kinds=kinds), ScoringWeights())
+    hl = next(h for h in found if h.round == 1 and "4k" in (h.merged_kinds or [h.kind]))
+    assert hl.kind == "4k"  # el tipo sigue siendo 4k (pesos y filtros no cambian)
+    assert hl.label.startswith("5K") and "4K" not in hl.label
+    assert hl.description.startswith("5K en la ronda 1")
+    assert "5K" in hl.tags and thumbnail_title(hl) == "5K"
+    restored = Highlight.from_dict(hl.to_dict())
+    assert restored.label == hl.label
+    # Con ACE activado sigue siendo un ACE.
+    ace = next(h for h in detect_multikills(ctx(match)) if h.round == 1)
+    assert ace.kind == "ace" and ace.label == "ACE"

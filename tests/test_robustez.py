@@ -281,6 +281,12 @@ def test_capture_cvar_is_applied_even_if_fresh_cs2_does_not_answer_in_time(tmp_p
     assert "demo_ui_mode 0" in cs2.sent
     assert not any(c.startswith("engine_no_focus_sleep") for c in cs2.sent)
     assert "demo_ui_modex3" in cs2.reads  # se reintenta antes de rendirse
+    # Sin poder leer el original se guarda el valor por defecto, para que la barra del reproductor vuelva al terminar.
+    assert json.loads(cs2.backup_path.read_text(encoding="utf-8")) == {"demo_ui_mode": "1"}
+    cs2.is_running = lambda: True  # type: ignore[method-assign]
+    cs2.sent.clear()
+    cs2.restore_cvars()
+    assert cs2.sent == ["demo_ui_mode 1"]
 
 
 @pytest.mark.skipif(not FFmpeg().available, reason="FFmpeg no instalado")
