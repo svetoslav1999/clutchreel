@@ -1,4 +1,4 @@
-"""Cliente de OBS Studio vía obs-websocket v5 (``obsws-python``).
+"""Cliente de OBS Studio vía obs-websocket v5 (cliente propio :mod:`clutchreel.core.recorder.obsws`).
 
 Responsabilidades: conectar, lanzar OBS si no está abierto, preparar la escena
 de captura de CS2, fijar carpeta/formato/resolución de grabación y
@@ -16,19 +16,26 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from clutchreel.core.recorder.obsws import (
+    STATUS_RESOURCE_ALREADY_EXISTS,
+    ObsRequestError,
+    ObsWebSocket,
+    ObsWsAuthError,
+    ObsWsCancelledError,
+    ObsWsError,
+    ObsWsTimeoutError,
+)
 from clutchreel.services.config import ObsSettings
 from clutchreel.utils.logging_setup import register_secret
 from clutchreel.utils.paths import obs_exe, obs_websocket_config
 from clutchreel.utils.winutil import is_process_running
 
 log = logging.getLogger(__name__)
-# obsws-python registra en INFO los parámetros de conexión, contraseña incluida («Connecting with parameters:
-# … password='…'»). Se silencia aquí, no solo en setup_logging, para que ningún uso del cliente la filtre.
-logging.getLogger("obsws_python").setLevel(logging.WARNING)
 
 CS2_WINDOW = "Counter-Strike 2:SDL_app:cs2.exe"
 # Formatos de OBS que FFmpeg corta sin problema; con cualquiera de ellos no se toca la configuración del usuario.
 GOOD_FORMATS = {"mkv", "mp4", "hybrid_mp4", "fragmented_mp4", "mov", "fragmented_mov"}
+RECORD_STOPPED = "OBS_WEBSOCKET_OUTPUT_STOPPED"
 
 
 def real_suffix(path: Path) -> str | None:
@@ -82,7 +89,7 @@ class ObsClient:
     def __init__(self, settings: ObsSettings, obs_path: str = "") -> None:
         self.settings = settings
         self.obs_path = obs_path
-        self._client: Any = None
+        self._client: ObsWebSocket | None = None
         self.cancel: threading.Event | None = None  # lo fija el grabador para cortar la espera al abrir OBS
 
     # ------------------------------------------------------------ connect ---
@@ -92,22 +99,15 @@ class ObsClient:
         return self._client is not None
 
     def connect(self, timeout: float = 4.0) -> None:
-        try:
-            import obsws_python as obs
-        except ImportError as exc:  # pragma: no cover
-            raise ObsError("Falta la librería obsws-python. Ejecuta Iniciar.bat.") from exc
         register_secret(self.settings.password)
+        client = ObsWebSocket(self.settings.host, int(self.settings.port), self.settings.password or "", timeout=timeout, cancel=self.cancel)
         try:
-            self._client = obs.ReqClient(
-                host=self.settings.host, port=int(self.settings.port), password=self.settings.password or "", timeout=timeout
-            )
-            ver = self._client.get_version()
-            log.info("Conectado a OBS %s (obs-websocket %s)", ver.obs_version, ver.obs_web_socket_version)
-        except Exception as exc:
-            self._client = None
-            text = str(exc)
-            if "authentication" in text.lower() or "auth" in text.lower():
-                raise ObsError("OBS rechazó la contraseña del WebSocket. Revísala en Ajustes → OBS.") from exc
+            client.connect()
+        except ObsWsCancelledError as exc:
+            raise ObsError("Grabación cancelada.") from exc
+        except ObsWsAuthError as exc:
+            raise ObsError("OBS rechazó la contraseña del WebSocket. Revísala en Ajustes → OBS.") from exc
+        except ObsWsError as exc:
             if is_process_running("obs64.exe"):
                 raise ObsError(
                     "OBS está abierto pero el servidor WebSocket no responde.\n"
@@ -115,23 +115,38 @@ class ObsClient:
                     f"en el puerto {self.settings.port} (o deja que ClutchReel reinicie OBS)."
                 ) from exc
             raise ObsError("OBS no está abierto o no responde en el puerto configurado.") from exc
+        self._client = client
+        log.info("Conectado a OBS %s (obs-websocket %s)", client.obs_version, client.obs_websocket_version)
 
     def disconnect(self) -> None:
-        if self._client is not None:
-            try:
-                self._client.disconnect()
-            except Exception:  # noqa: BLE001
-                pass
-        self._client = None
+        client, self._client = self._client, None
+        if client is not None:
+            client.close()
+
+    def _req(self, request_type: str, data: dict[str, Any] | None = None, timeout: float | None = None) -> dict[str, Any]:
+        """Petición al cliente activo. ``cancel`` se respeta en toda espera."""
+        assert self._client is not None, "OBS no conectado"
+        self._client.cancel = self.cancel
+        try:
+            return self._client.request(request_type, data, timeout=timeout)
+        except ObsWsCancelledError as exc:
+            raise ObsError("Grabación cancelada.") from exc
+        except ObsWsTimeoutError as exc:
+            raise ObsError(f"OBS no contestó a tiempo ({request_type}).") from exc
+        except ObsRequestError:
+            raise
+        except ObsWsError as exc:
+            self._client = None
+            raise ObsError(f"Se perdió la conexión con OBS: {exc}") from exc
 
     def status(self) -> ObsStatus:
         try:
             if not self._client:
                 self.connect(timeout=2.0)
             assert self._client is not None
-            ver = self._client.get_version()
-            rec = self._client.get_record_status()
-            return ObsStatus(True, str(ver.obs_version), bool(rec.output_active))
+            ver = self._req("GetVersion")
+            rec = self._req("GetRecordStatus")
+            return ObsStatus(True, str(ver.get("obsVersion", "")), bool(rec.get("outputActive")))
         except ObsError as exc:
             return ObsStatus(False, message=str(exc))
         except Exception as exc:  # noqa: BLE001
@@ -176,11 +191,10 @@ class ObsClient:
     def ensure_connected(self, allow_launch: bool = True) -> None:
         if self.connected:
             try:
-                assert self._client is not None
-                self._client.get_version()
+                self._req("GetVersion")
                 return
             except Exception:  # noqa: BLE001
-                self._client = None
+                self.disconnect()
         try:
             self.connect()
             return
@@ -191,54 +205,68 @@ class ObsClient:
 
     # ------------------------------------------------------------- scene ----
 
+    def _input_map(self) -> dict[str, str]:
+        return {str(i.get("inputName")): str(i.get("inputKind")) for i in self._req("GetInputList").get("inputs", [])}
+
+    def _scene_items(self, scene: str) -> list[dict[str, Any]]:
+        items = self._req("GetSceneItemList", {"sceneName": scene}).get("sceneItems", [])
+        return [i for i in items if isinstance(i, dict)]
+
     def ensure_scene(self) -> str:
         """Crea/verifica la escena y la fuente de captura de CS2. Devuelve el modo usado."""
         assert self._client is not None, "OBS no conectado"
-        c = self._client
         scene = self.settings.scene_name
         source = self.settings.source_name
-        scenes = {s["sceneName"] for s in c.get_scene_list().scenes}
+        scenes = {str(s.get("sceneName")) for s in self._req("GetSceneList").get("scenes", [])}
         if scene not in scenes:
-            c.create_scene(scene)
+            self._req("CreateScene", {"sceneName": scene})
             log.info("Escena OBS creada: %s", scene)
-        kinds = set(c.get_input_kind_list(False).input_kinds)
-        inputs = {i["inputName"]: i["inputKind"] for i in c.get_input_list().inputs}
+        kinds = {str(k) for k in self._req("GetInputKindList", {"unversioned": False}).get("inputKinds", [])}
+        inputs = self._input_map()
         mode = self.settings.capture_mode
         kind, settings = self._capture_settings(mode, kinds)
         if source in inputs and inputs[source] != kind:
-            c.remove_input(source)
+            self._req("RemoveInput", {"inputName": source})
             inputs.pop(source, None)
             self._wait_input_gone(source)
         if source not in inputs:
-            c.create_input(scene, source, kind, settings, True)
+            create = {"sceneName": scene, "inputName": source, "inputKind": kind, "inputSettings": settings, "sceneItemEnabled": True}
+            try:
+                self._req("CreateInput", create)
+            except ObsRequestError as exc:
+                if exc.code != STATUS_RESOURCE_ALREADY_EXISTS:
+                    raise
+                # OBS todavía no había liberado el nombre de la fuente borrada (601): un reintento basta.
+                self._wait_input_gone(source)
+                self._req("CreateInput", create)
             log.info("Fuente OBS creada: %s (%s)", source, kind)
         else:
-            c.set_input_settings(source, settings, True)
-            items = c.get_scene_item_list(scene).scene_items
-            if not any(i["sourceName"] == source for i in items):
-                c.create_scene_item(scene, source, True)
+            self._req("SetInputSettings", {"inputName": source, "inputSettings": settings, "overlay": True})
+            if not any(i.get("sourceName") == source for i in self._scene_items(scene)):
+                self._req("CreateSceneItem", {"sceneName": scene, "sourceName": source, "sceneItemEnabled": True})
         # Deja la fuente a pantalla completa (bounds = lienzo).
         try:
-            items = c.get_scene_item_list(scene).scene_items
-            for item in items:
-                if item["sourceName"] == source:
-                    vs = c.get_video_settings()
-                    c.set_scene_item_transform(
-                        scene,
-                        item["sceneItemId"],
-                        {"boundsType": "OBS_BOUNDS_SCALE_INNER", "boundsWidth": vs.base_width, "boundsHeight": vs.base_height, "positionX": 0, "positionY": 0},
-                    )
+            for item in self._scene_items(scene):
+                if item.get("sourceName") == source:
+                    vs = self._req("GetVideoSettings")
+                    transform = {
+                        "boundsType": "OBS_BOUNDS_SCALE_INNER",
+                        "boundsWidth": vs.get("baseWidth"),
+                        "boundsHeight": vs.get("baseHeight"),
+                        "positionX": 0,
+                        "positionY": 0,
+                    }
+                    self._req("SetSceneItemTransform", {"sceneName": scene, "sceneItemId": item.get("sceneItemId"), "sceneItemTransform": transform})
         except Exception as exc:  # noqa: BLE001
             log.debug("No se pudo ajustar la transformación: %s", exc)
-        c.set_current_program_scene(scene)
+        self._req("SetCurrentProgramScene", {"sceneName": scene})
         return mode
 
     def _wait_input_gone(self, name: str, timeout: float = 5.0) -> None:
         """OBS libera el nombre de una fuente borrada de forma asíncrona; sin esperar, CreateInput da error 601."""
-        assert self._client is not None
         deadline = time.time() + timeout
         while time.time() < deadline:
-            if name not in {i["inputName"] for i in self._client.get_input_list().inputs}:
+            if name not in self._input_map():
                 break
             time.sleep(0.1)
         time.sleep(0.3)
@@ -265,18 +293,17 @@ class ObsClient:
     # ----------------------------------------------------------- settings ---
 
     def apply_recording_settings(self, output_dir: Path) -> None:
-        assert self._client is not None
-        c = self._client
+        assert self._client is not None, "OBS no conectado"
         output_dir.mkdir(parents=True, exist_ok=True)
         try:
-            c.set_record_directory(str(output_dir))
-        except Exception as exc:  # noqa: BLE001
-            log.debug("set_record_directory no soportado (%s); se usa el perfil", exc)
+            self._req("SetRecordDirectory", {"recordDirectory": str(output_dir)})
+        except ObsRequestError as exc:
+            log.debug("SetRecordDirectory no soportado (%s); se usa el perfil", exc)
         for category, name in (("SimpleOutput", "FilePath"), ("AdvOut", "RecFilePath")):
             try:
-                c.set_profile_parameter(category, name, str(output_dir))
-            except Exception as exc:  # noqa: BLE001
-                log.debug("set_profile_parameter %s/%s: %s", category, name, exc)
+                self._req("SetProfileParameter", {"parameterCategory": category, "parameterName": name, "parameterValue": str(output_dir)})
+            except ObsRequestError as exc:
+                log.debug("SetProfileParameter %s/%s: %s", category, name, exc)
         # Formato: solo se cambia si el del usuario no sirve para cortar con FFmpeg. Cambiarlo con OBS
         # abierto hace que OBS use la extensión nueva pero siga muxeando con el formato anterior
         # (verificado con OBS 33: ficheros .mkv que en realidad eran MP4), así que se toca lo mínimo
@@ -284,36 +311,42 @@ class ObsClient:
         fmt = self.settings.recording_format or "mkv"
         for category in ("SimpleOutput", "AdvOut"):
             try:
-                current = str(c.get_profile_parameter(category, "RecFormat2").parameter_value or "")
-            except Exception:  # noqa: BLE001
+                current = str(self._req("GetProfileParameter", {"parameterCategory": category, "parameterName": "RecFormat2"}).get("parameterValue") or "")
+            except ObsRequestError:
                 current = ""
             if current in GOOD_FORMATS:
                 continue
             try:
-                c.set_profile_parameter(category, "RecFormat2", fmt)
+                self._req("SetProfileParameter", {"parameterCategory": category, "parameterName": "RecFormat2", "parameterValue": fmt})
                 log.info("Formato de grabación de OBS (%s) cambiado de «%s» a «%s»", category, current or "?", fmt)
-            except Exception as exc:  # noqa: BLE001
+            except ObsRequestError as exc:
                 log.debug("RecFormat2 %s: %s", category, exc)
         if self.settings.manage_video_settings:
             try:
-                rec = c.get_record_status()
-                if not rec.output_active:
-                    c.set_video_settings(int(self.settings.fps), 1, int(self.settings.width), int(self.settings.height), int(self.settings.width), int(self.settings.height))
+                if not self.is_recording():
+                    w, h = int(self.settings.width), int(self.settings.height)
+                    self._req(
+                        "SetVideoSettings",
+                        {"fpsNumerator": int(self.settings.fps), "fpsDenominator": 1, "baseWidth": w, "baseHeight": h, "outputWidth": w, "outputHeight": h},
+                    )
             except Exception as exc:  # noqa: BLE001
                 log.warning("No se pudieron fijar resolución/FPS en OBS: %s", exc)
 
     # ------------------------------------------------------------ record ----
 
     def is_recording(self) -> bool:
-        assert self._client is not None
-        return bool(self._client.get_record_status().output_active)
+        return bool(self._req("GetRecordStatus").get("outputActive"))
 
     def start_record(self) -> None:
-        assert self._client is not None
+        assert self._client is not None, "OBS no conectado"
         if self.is_recording():
-            self._client.stop_record()
+            self._req("StopRecord")
             time.sleep(1.0)
-        self._client.start_record()
+        self._client.pop_events("RecordStateChanged")
+        try:
+            self._req("StartRecord")
+        except ObsRequestError as exc:
+            raise ObsError(f"OBS no pudo empezar a grabar ({exc.comment or exc.code}). Revisa el codificador y la carpeta de salida en OBS.") from exc
         deadline = time.time() + 8.0
         while time.time() < deadline:
             if self.is_recording():
@@ -322,15 +355,24 @@ class ObsClient:
         raise ObsError("OBS no empezó a grabar. Revisa el codificador y la carpeta de salida en OBS.")
 
     def stop_record(self) -> Path | None:
-        assert self._client is not None
+        assert self._client is not None, "OBS no conectado"
+        client = self._client
+        client.pop_events("RecordStateChanged")
         try:
-            resp = self._client.stop_record()
-        except Exception as exc:
+            resp = self._req("StopRecord")
+        except ObsRequestError as exc:
             raise ObsError(f"OBS no pudo parar la grabación: {exc}") from exc
-        path_text = getattr(resp, "output_path", "") or ""
+        path_text = str(resp.get("outputPath") or "")
         deadline = time.time() + 10.0
         while time.time() < deadline and self.is_recording():
             time.sleep(0.2)
+        if not path_text:
+            # Si la respuesta no trae la ruta, la da el evento RecordStateChanged (outputState STOPPED).
+            try:
+                event = client.wait_event("RecordStateChanged", lambda e: e.get("outputState") == RECORD_STOPPED, timeout=5.0)
+                path_text = str(event.get("outputPath") or "")
+            except ObsWsError as exc:
+                log.debug("Sin evento RecordStateChanged con la ruta: %s", exc)
         if not path_text:
             return None
         path = Path(path_text)
@@ -341,10 +383,14 @@ class ObsClient:
 
     def source_brightness(self) -> float | None:
         """Brillo medio (0-255) de la fuente de captura; ``None`` si no se pudo capturar."""
-        assert self._client is not None
+        assert self._client is not None, "OBS no conectado"
         try:
-            resp = self._client.get_source_screenshot(self.settings.source_name, "png", 32, 32, 50)
-            data = resp.image_data
+            resp = self._req(
+                "GetSourceScreenshot",
+                {"sourceName": self.settings.source_name, "imageFormat": "png", "imageWidth": 32, "imageHeight": 32, "imageCompressionQuality": 50},
+                timeout=8.0,
+            )
+            data = str(resp.get("imageData") or "")
             if "," in data:
                 data = data.split(",", 1)[1]
             raw = base64.b64decode(data)

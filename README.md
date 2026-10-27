@@ -136,7 +136,7 @@ Tema oscuro grafito con un único acento naranja. Cada tipo de jugada tiene su c
 
 - **Jugador**: SteamID64 y nombre (se rellena desde las cuentas de Steam del PC).
 - **Rutas**: demos, salida, FFmpeg, OBS, CS2, música. Vacío = detección automática.
-- **OBS**: host/puerto/contraseña (se leen de la configuración de obs-websocket; nunca se pasan por línea de comandos y el registro tacha cualquier contraseña, también la que imprime la librería obs-websocket al conectar), modo de captura, formato (solo se cambia si el de OBS no sirve), resolución y FPS. ClutchReel toca en OBS únicamente: la escena/fuente «ClutchReel», la carpeta de grabación y, si está marcado «Fijar resolución y FPS», el lienzo.
+- **OBS**: host/puerto/contraseña (se leen de la configuración de obs-websocket; nunca se pasan por línea de comandos, solo sirven para calcular la cadena de autenticación del protocolo y el registro tacha cualquier contraseña), modo de captura, formato (solo se cambia si el de OBS no sirve), resolución y FPS. ClutchReel toca en OBS únicamente: la escena/fuente «ClutchReel», la carpeta de grabación y, si está marcado «Fijar resolución y FPS», el lienzo.
 - **CS2**: opciones de lanzamiento, puerto de consola, `-tools` (desactivado), comandos de HUD, esperas, latencia, ventana forzada, respaldos.
 - **Calidad y detección**: preset, códec H.264/HEVC, NVENC/AMF/QSV/CPU, bitrate, loudnorm, miniatura, abrir carpeta/notificar/apagar al terminar, márgenes antes/después de cada jugada, ventana de multikill, fusión de jugadas cercanas.
 - **YouTube**, **Modo automático**, **Apariencia** (tema oscuro/claro, bandeja).

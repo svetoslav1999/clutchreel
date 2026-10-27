@@ -41,7 +41,7 @@ def redact(text: str) -> str:
 
 
 class RedactingFilter(logging.Filter):
-    """Tacha secretos del mensaje ya formateado (también los que llegan de librerías como obsws-python)."""
+    """Tacha secretos del mensaje ya formateado (también los que llegan de librerías de terceros)."""
 
     def filter(self, record: logging.LogRecord) -> bool:
         try:
@@ -88,7 +88,7 @@ def setup_logging(level: int = logging.INFO) -> logging.Logger:
     console.addFilter(RedactingFilter())
     root.addHandler(console)
 
-    for noisy in ("urllib3", "googleapiclient", "PIL", "obsws_python"):
+    for noisy in ("urllib3", "googleapiclient", "PIL", "websocket"):
         logging.getLogger(noisy).setLevel(logging.WARNING)
 
     root._clutchreel_configured = True  # type: ignore[attr-defined]

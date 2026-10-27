@@ -6,6 +6,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import sys
 import threading
 import time
 from pathlib import Path
@@ -198,7 +199,7 @@ def test_project_file_that_is_not_an_object_is_rejected(tmp_path: Path) -> None:
 
 
 def test_obs_library_password_line_is_redacted() -> None:
-    """obsws-python registra «password='…'» en INFO al conectar."""
+    """Una línea con «password='…'» (como la que registraba la antigua librería obsws-python) se tacha."""
     line = "Connecting with parameters: host='127.0.0.1' port=4455 password='S3cretoDeOBS' subs=0 timeout=4.0"
     out = redact(line)
     assert "S3cretoDeOBS" not in out and "password='***'" in out
@@ -226,10 +227,14 @@ def test_registered_secret_never_reaches_a_handler(tmp_path: Path) -> None:
     assert "Zq9PalabraSecreta" not in text and "***" in text
 
 
-def test_obsws_logger_is_silenced_by_the_client_itself() -> None:
-    import clutchreel.core.recorder.obs_client  # noqa: F401
+def test_obs_client_does_not_depend_on_obsws_python() -> None:
+    import clutchreel.core.recorder.obs_client as mod
+    from clutchreel.core.recorder import obsws
 
-    assert logging.getLogger("obsws_python.baseclient.ObsClient").getEffectiveLevel() >= logging.WARNING
+    for path in (Path(mod.__file__), Path(obsws.__file__)):
+        src = path.read_text(encoding="utf-8")
+        assert "import obsws_python" not in src and "from obsws_python" not in src
+    assert sys.modules.get("obsws_python") is None
 
 
 def test_error_report_redacts_old_log_files(monkeypatch, tmp_path: Path) -> None:  # type: ignore[no-untyped-def]
