@@ -319,6 +319,8 @@ class Recorder:
             log.debug("No se pudo dejar CS2 en pausa: %s", exc)
         if self.config.cs2.close_game_when_done:
             self.cs2.close_game()
+        elif self.cs2.is_running() and self.cs2.minimize_game():
+            log.info("CS2 minimizado para liberar la GPU durante la exportación")
 
     def _may_relaunch(self) -> bool:
         """CS2 se cerró a mitad: se pregunta antes de reabrirlo (puede haberlo cerrado el usuario).
@@ -346,9 +348,14 @@ class Recorder:
         for attempt, mode in enumerate(("game", "window", "display")):
             if attempt == 0 and self.config.obs.capture_mode != "game":
                 mode = self.config.obs.capture_mode
-            time.sleep(settle)
+            # Se mira la imagen cada 0,25 s hasta el plazo (antes se esperaba el plazo entero aunque
+            # la captura ya funcionara): el resultado es el mismo, pero sin esperas de sobra.
+            deadline = time.monotonic() + settle
             settle = 5.0  # tras cambiar de fuente, OBS tarda en enganchar y renderizar
             brightness = self.obs.source_brightness()
+            while brightness is not None and brightness <= 6.0 and time.monotonic() < deadline:
+                time.sleep(0.25)
+                brightness = self.obs.source_brightness()
             if brightness is None or brightness > 6.0:
                 return
             log.warning("La fuente de OBS parece negra (%.1f) con modo %s; probando otro modo", brightness, mode)

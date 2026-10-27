@@ -87,8 +87,8 @@ if sys.platform == "win32":
         except Exception:  # noqa: BLE001
             return ""
 
-    def focus_window(title_contains: str, exe_name: str = "cs2.exe") -> bool:
-        """Pone en primer plano la ventana del proceso ``exe_name`` cuyo título contiene ``title_contains``.
+    def find_window(title_contains: str, exe_name: str = "cs2.exe") -> int | None:
+        """Ventana visible del proceso ``exe_name`` cuyo título contiene ``title_contains``.
 
         Se comprueba el ejecutable para no confundir CS2 con, p. ej., una pestaña del
         navegador titulada «Counter-Strike 2».
@@ -110,9 +110,13 @@ if sys.platform == "win32":
             return True
 
         _user32.EnumWindows(enum_proc, 0)
-        if not found:
+        return found[0] if found else None
+
+    def focus_window(title_contains: str, exe_name: str = "cs2.exe") -> bool:
+        """Pone en primer plano la ventana de ``exe_name`` cuyo título contiene ``title_contains``."""
+        hwnd = find_window(title_contains, exe_name)
+        if hwnd is None:
             return False
-        hwnd = found[0]
         if _user32.IsIconic(hwnd):
             _user32.ShowWindow(hwnd, 9)  # SW_RESTORE
         # Windows solo deja cambiar el primer plano a quien tiene la última entrada:
@@ -123,6 +127,15 @@ if sys.platform == "win32":
         time.sleep(0.3)
         return bool(_user32.GetForegroundWindow() == hwnd)
 
+    def minimize_window(title_contains: str, exe_name: str = "cs2.exe") -> bool:
+        """Minimiza la ventana (sin cerrar el programa). ``True`` si estaba y se minimizó."""
+        hwnd = find_window(title_contains, exe_name)
+        if hwnd is None:
+            return False
+        if not _user32.IsIconic(hwnd):
+            _user32.ShowWindow(hwnd, 6)  # SW_MINIMIZE
+        return True
+
 else:  # pragma: no cover - solo Windows
 
     def press_scancode(name: str, hold: float = 0.05) -> None:
@@ -132,4 +145,7 @@ else:  # pragma: no cover - solo Windows
         raise OSError("Solo disponible en Windows")
 
     def focus_window(title_contains: str, exe_name: str = "cs2.exe") -> bool:
+        return False
+
+    def minimize_window(title_contains: str, exe_name: str = "cs2.exe") -> bool:
         return False

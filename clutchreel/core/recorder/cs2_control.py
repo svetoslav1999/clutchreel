@@ -494,6 +494,19 @@ class Cs2Controller:
         except OSError:
             return False
 
+    def minimize_game(self) -> bool:
+        """Minimiza la ventana de CS2 (no lo cierra).
+
+        En primer plano y con la demo en pausa, CS2 sigue dibujando sin límite de FPS y deja la GPU al
+        100 %: la exportación con NVENC tardaba 15 veces más (medido: 98,6 s frente a 6,5 s por clip).
+        """
+        from clutchreel.core.recorder import win_input
+
+        try:
+            return win_input.minimize_window("Counter-Strike 2", CS2_EXE)
+        except OSError:
+            return False
+
     # ------------------------------------------------------- cvars limpias ---
 
     def _load_backup(self) -> dict[str, str]:

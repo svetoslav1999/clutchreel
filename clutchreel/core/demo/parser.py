@@ -14,6 +14,7 @@ La API de demoparser2 se verificó con una demo Premier real (octubre 2026):
 from __future__ import annotations
 
 import datetime as dt
+import json
 import logging
 import math
 import os
@@ -112,6 +113,41 @@ def quick_validate(path: Path) -> None:
         raise DemoError("El archivo no tiene cabecera de demo de CS2 (puede estar corrupto).")
 
 
+# Eventos que se leen de la demo y propiedades extra que pide cada uno.
+_EVENTS: dict[str, dict[str, list[str]]] = {
+    "round_start": {},
+    "round_end": {"other": ["team_rounds_total", "total_rounds_played"]},
+    "round_freeze_end": {},
+    "player_death": {"player": ["team_num"], "other": ["total_rounds_played", "is_warmup_period"]},
+    "player_hurt": {"player": ["team_num"]},
+    "cs_win_panel_match": {},
+}
+
+
+class _EventReader:
+    """Lee todos los eventos de una sola pasada por la demo (``parse_events``).
+
+    Antes se recorría la demo entera una vez por evento (6 pasadas, ~1,4 s de 2 s con una demo
+    Premier de 220 MB). Si la lectura conjunta falla, se vuelve a la lectura evento a evento.
+    """
+
+    def __init__(self, parser: Any) -> None:
+        self.parser = parser
+        self.cache: dict[str, list[dict[str, Any]]] | None = None
+        player = sorted({p for spec in _EVENTS.values() for p in spec.get("player", [])})
+        other = sorted({o for spec in _EVENTS.values() for o in spec.get("other", [])})
+        try:
+            self.cache = {name: df.to_dict("records") for name, df in parser.parse_events(list(_EVENTS), player=player, other=other)}
+        except Exception as exc:  # noqa: BLE001 - versión de demoparser2 sin parse_events o demo rara
+            log.debug("Lectura conjunta de eventos no disponible (%s); se leen uno a uno", exc)
+
+    def records(self, name: str) -> list[dict[str, Any]]:
+        if self.cache is not None and name in self.cache:
+            return self.cache[name]
+        spec = _EVENTS.get(name, {})
+        return self.parser.parse_event(name, **spec).to_dict("records")
+
+
 def parse_demo(path: str | os.PathLike[str], progress: ProgressFn | None = None, cancel: threading.Event | None = None) -> MatchData:
     """Analiza la demo completa. Lanza :class:`DemoError` con mensajes claros.
 
@@ -138,6 +174,7 @@ def parse_demo(path: str | os.PathLike[str], progress: ProgressFn | None = None,
     except Exception as exc:
         raise DemoError(f"La demo no se pudo abrir (¿corrupta o incompleta?):\n{exc}") from exc
 
+    events = _EventReader(parser)
     map_name = _safe_str(header.get("map_name")) or "desconocido"
     server_name = _safe_str(header.get("server_name"))
     report(8, f"Mapa {map_name}. Leyendo jugadores…")
@@ -157,14 +194,12 @@ def parse_demo(path: str | os.PathLike[str], progress: ProgressFn | None = None,
     # Rondas ---------------------------------------------------------------
     report(15, "Leyendo rondas…")
     try:
-        starts = parser.parse_event("round_start").to_dict("records")
-        ends = parser.parse_event(
-            "round_end", other=["team_rounds_total", "total_rounds_played"]
-        ).to_dict("records")
+        starts = events.records("round_start")
+        ends = events.records("round_end")
     except Exception as exc:
         raise DemoError(f"La demo no contiene información de rondas legible:\n{exc}") from exc
     try:
-        freeze_ends = [_safe_int(r.get("tick")) for r in parser.parse_event("round_freeze_end").to_dict("records")]
+        freeze_ends = [_safe_int(r.get("tick")) for r in events.records("round_freeze_end")]
     except Exception:  # noqa: BLE001
         freeze_ends = []
 
@@ -205,21 +240,25 @@ def parse_demo(path: str | os.PathLike[str], progress: ProgressFn | None = None,
 
     # Tickrate real --------------------------------------------------------
     report(30, "Calculando tickrate…")
-    tickrate = _estimate_tickrate(parser, rounds)
+    # Una sola lectura de ticks para el tickrate y las alineaciones (antes, dos pasadas por la demo).
+    t1, t2 = _tickrate_ticks(rounds)
+    lineup_ticks = _lineup_ticks(rounds)
+    try:
+        ticks_df: Any = parser.parse_ticks(["game_time", "team_num", "is_alive", "user_id"], ticks=sorted({t1, t2, *lineup_ticks}))
+    except Exception as exc:  # noqa: BLE001
+        log.debug("Lectura conjunta de ticks no disponible (%s); se leen por separado", exc)
+        ticks_df = None
+    tickrate = _estimate_tickrate(parser, rounds, ticks_df)
 
     # Kills ---------------------------------------------------------------
     report(40, "Leyendo bajas…")
     try:
-        deaths_df = parser.parse_event(
-            "player_death",
-            player=["team_num"],
-            other=["total_rounds_played", "is_warmup_period"],
-        )
+        deaths = events.records("player_death")
     except Exception as exc:
         raise DemoError(f"No se pudieron leer las bajas de la demo:\n{exc}") from exc
 
     kills: list[KillEvent] = []
-    for row in deaths_df.to_dict("records"):
+    for row in deaths:
         if _safe_bool(row.get("is_warmup_period")):
             continue
         tick = _safe_int(row.get("tick"))
@@ -263,14 +302,14 @@ def parse_demo(path: str | os.PathLike[str], progress: ProgressFn | None = None,
 
     # Equipos por ronda + user_id ---------------------------------------------
     report(65, "Leyendo alineaciones por ronda…")
-    _fill_round_lineups(parser, rounds, players)
+    _fill_round_lineups(parser, rounds, players, ticks_df)
 
     # Daño (ADR) ---------------------------------------------------------------
     report(80, "Calculando daño…")
     try:
-        hurt = parser.parse_event("player_hurt", player=["team_num"])
-        if len(hurt):
-            for row in hurt.to_dict("records"):
+        hurt = events.records("player_hurt")
+        if hurt:
+            for row in hurt:
                 att = _safe_int(row.get("attacker_steamid"))
                 victim = _safe_int(row.get("user_steamid"))
                 same_team = _safe_int(row.get("attacker_team_num")) == _safe_int(row.get("user_team_num"))
@@ -282,9 +321,9 @@ def parse_demo(path: str | os.PathLike[str], progress: ProgressFn | None = None,
 
     total_ticks = max([r.end_tick for r in rounds] + [k.tick for k in kills] + [0])
     try:
-        win_panel = parser.parse_event("cs_win_panel_match")
-        if len(win_panel):
-            total_ticks = max(total_ticks, _safe_int(win_panel.iloc[-1]["tick"]))
+        win_panel = events.records("cs_win_panel_match")
+        if win_panel:
+            total_ticks = max(total_ticks, _safe_int(win_panel[-1].get("tick")))
     except Exception:  # noqa: BLE001
         pass
 
@@ -322,6 +361,56 @@ def parse_demo(path: str | os.PathLike[str], progress: ProgressFn | None = None,
     return match
 
 
+# Súbelo cuando cambie lo que produce el análisis: invalida la caché de demos ya analizadas.
+ANALYSIS_VERSION = 1
+CACHE_KEEP = 40
+
+
+def _cache_file(demo_path: Path) -> Path | None:
+    from clutchreel.services.history import demo_fingerprint
+    from clutchreel.utils.paths import cache_dir
+
+    fingerprint = demo_fingerprint(demo_path)
+    if not fingerprint:
+        return None
+    return cache_dir() / "analisis" / f"{fingerprint}-v{ANALYSIS_VERSION}.json"
+
+
+def parse_demo_cached(path: str | os.PathLike[str], progress: ProgressFn | None = None, cancel: threading.Event | None = None) -> MatchData:
+    """Como :func:`parse_demo`, pero reutiliza el análisis de una demo ya analizada (mismo contenido).
+
+    La clave es la huella del fichero (tamaño + primeros y últimos 64 KB) y la versión del análisis,
+    así que una demo movida o copiada se reconoce y una distinta nunca usa datos ajenos.
+    """
+    demo_path = Path(path)
+    quick_validate(demo_path)
+    cache = _cache_file(demo_path)
+    if cache is not None and cache.exists():
+        try:
+            match = MatchData.from_dict(json.loads(cache.read_text(encoding="utf-8")))
+            match.demo_path = str(demo_path)  # puede ser otra copia de la misma demo
+            match.demo_date = _demo_date_from_name(demo_path)
+            if progress:
+                progress(100, "Análisis recuperado de la caché")
+            log.info("Análisis de %s recuperado de la caché", demo_path.name)
+            return match
+        except (OSError, ValueError, TypeError, KeyError) as exc:
+            log.warning("Caché de análisis ilegible (%s); se vuelve a analizar", exc)
+    match = parse_demo(demo_path, progress=progress, cancel=cancel)
+    if cache is not None:
+        try:
+            cache.parent.mkdir(parents=True, exist_ok=True)
+            tmp = cache.with_suffix(".tmp")
+            tmp.write_text(json.dumps(match.to_dict(), ensure_ascii=False), encoding="utf-8")
+            os.replace(tmp, cache)
+            old = sorted(cache.parent.glob("*.json"), key=lambda p: p.stat().st_mtime, reverse=True)[CACHE_KEEP:]
+            for stale in old:
+                stale.unlink(missing_ok=True)
+        except OSError as exc:
+            log.debug("No se pudo guardar la caché de análisis: %s", exc)
+    return match
+
+
 def _round_for_tick(rounds: list[RoundInfo], tick: int, tickrate: float = DEFAULT_TICKRATE) -> int:
     for r in rounds:
         if r.start_tick <= tick <= r.end_tick:
@@ -333,12 +422,20 @@ def _round_for_tick(rounds: list[RoundInfo], tick: int, tickrate: float = DEFAUL
     return 0
 
 
-def _estimate_tickrate(parser: Any, rounds: list[RoundInfo]) -> float:
+def _tickrate_ticks(rounds: list[RoundInfo]) -> tuple[int, int]:
+    t1 = max(1, rounds[0].start_tick + 10)
+    return t1, max(t1 + 1000, rounds[-1].end_tick - 10)
+
+
+def _lineup_ticks(rounds: list[RoundInfo]) -> list[int]:
+    return [max(r.freeze_end_tick, r.start_tick) + 2 for r in rounds]
+
+
+def _estimate_tickrate(parser: Any, rounds: list[RoundInfo], ticks_df: Any = None) -> float:
     """Tickrate real a partir de ``game_time`` en dos ticks distantes."""
     try:
-        t1 = max(1, rounds[0].start_tick + 10)
-        t2 = max(t1 + 1000, rounds[-1].end_tick - 10)
-        df = parser.parse_ticks(["game_time"], ticks=[t1, t2])
+        t1, t2 = _tickrate_ticks(rounds)
+        df = ticks_df if ticks_df is not None else parser.parse_ticks(["game_time"], ticks=[t1, t2])
         if len(df):
             df = df.drop_duplicates("tick")
             times = {int(r["tick"]): float(r["game_time"]) for r in df.to_dict("records")}
@@ -354,10 +451,10 @@ def _estimate_tickrate(parser: Any, rounds: list[RoundInfo]) -> float:
     return DEFAULT_TICKRATE
 
 
-def _fill_round_lineups(parser: Any, rounds: list[RoundInfo], players: dict[int, PlayerInfo]) -> None:
-    ticks = [max(r.freeze_end_tick, r.start_tick) + 2 for r in rounds]
+def _fill_round_lineups(parser: Any, rounds: list[RoundInfo], players: dict[int, PlayerInfo], ticks_df: Any = None) -> None:
+    ticks = _lineup_ticks(rounds)
     try:
-        df = parser.parse_ticks(["team_num", "is_alive", "user_id"], ticks=ticks)
+        df = ticks_df if ticks_df is not None else parser.parse_ticks(["team_num", "is_alive", "user_id"], ticks=ticks)
     except Exception as exc:  # noqa: BLE001
         log.warning("parse_ticks de alineaciones falló: %s", exc)
         for r in rounds:

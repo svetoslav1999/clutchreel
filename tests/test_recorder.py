@@ -155,6 +155,10 @@ class FakeCs2(Cs2Controller):
     def close_game(self) -> None:
         self.sent.append("quit")
 
+    def minimize_game(self) -> bool:
+        self.sent.append("minimize")  # nunca toca la ventana real de CS2 durante los tests
+        return True
+
 
 @pytest.fixture
 def project(match, tmp_path):  # type: ignore[no-untyped-def]
@@ -197,7 +201,7 @@ def test_records_all_clips_and_sets_offsets(project, tmp_path, monkeypatch):  # 
     assert not any("accountid" in c for c in cs2.sent)
     for c in project.clips:
         assert c.camera_verified and c.recorded_player_steamid == ME and c.recorded_player_name == "yo"
-    assert cs2.sent[-1] == "restore"  # variables de captura restauradas al terminar
+    assert cs2.sent[-2:] == ["restore", "minimize"]  # variables restauradas y CS2 minimizado (libera la GPU para exportar)
     assert cs2.sent.count("resume") == 2 and obs.calls.count("start") == 2 and obs.calls.count("stop") == 2
     # El tick de inicio incluye 1 s de margen previo (64 ticks)
     assert "goto 1336" in cs2.sent

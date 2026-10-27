@@ -6,13 +6,16 @@ import logging
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
-
-import numpy as np
+from typing import TYPE_CHECKING
 
 from clutchreel.core.export.ffmpeg import FFmpeg
 from clutchreel.utils.winutil import subprocess_flags
 
+if TYPE_CHECKING:
+    import numpy as np
+
 log = logging.getLogger(__name__)
+# numpy (~0,25 s de importación) se carga al comprobar el primer clip, no al abrir la app.
 
 
 @dataclass
@@ -26,6 +29,8 @@ class ClipCheck:
 
 def _frames_gray(ffmpeg: FFmpeg, path: Path, fps: int = 10, size: int = 64, max_seconds: float = 120.0) -> np.ndarray:
     """Fotogramas en gris ``(n, size, size)`` muestreados a ``fps``."""
+    import numpy as np
+
     if not ffmpeg.path:
         return np.zeros((0, size, size), dtype=np.uint8)
     cmd = [
@@ -66,6 +71,8 @@ def check_clip(ffmpeg: FFmpeg, path: Path, expected_duration: float = 0.0) -> Cl
         return ClipCheck(False, "La grabación no contiene vídeo.", info.duration)
     if expected_duration > 0 and info.duration < expected_duration * 0.5:
         return ClipCheck(False, f"La grabación dura {info.duration:.1f} s, menos de la mitad de lo esperado.", info.duration)
+    import numpy as np
+
     frames = _frames_gray(ffmpeg, path)
     if frames.shape[0] == 0:
         return ClipCheck(True, "No se pudo analizar el contenido; se da por válida.", info.duration)
@@ -81,6 +88,8 @@ def check_clip(ffmpeg: FFmpeg, path: Path, expected_duration: float = 0.0) -> Cl
 
 def detect_motion_start(frames: np.ndarray, fps: int, threshold: float = 1.5) -> float | None:
     """Segundo en que empieza el movimiento sostenido (para calibrar latencia)."""
+    import numpy as np
+
     if frames.shape[0] < 3:
         return None
     diffs = np.abs(np.diff(frames.astype(np.int16), axis=0)).mean(axis=(1, 2))

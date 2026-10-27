@@ -29,8 +29,32 @@ class HistoryEntry:
     stats: dict[str, Any] = field(default_factory=dict)
 
 
+_FP_CACHE: dict[tuple[str, int, int], str] = {}
+
+
 def demo_fingerprint(path: Path) -> str:
-    """Hash rápido: tamaño + primeros/últimos 64 KB (no lee 200 MB enteros)."""
+    """Hash rápido: tamaño + primeros/últimos 64 KB (no lee 200 MB enteros).
+
+    Se memoriza por (ruta, tamaño, fecha de modificación): Inicio lo pide para cada demo de la lista
+    en cada refresco y antes releía 128 KB de cada una.
+    """
+    try:
+        st = path.stat()
+    except OSError:
+        return ""
+    key = (str(path), st.st_size, st.st_mtime_ns)
+    cached = _FP_CACHE.get(key)
+    if cached is not None:
+        return cached
+    fp = _fingerprint(path)
+    if fp:
+        if len(_FP_CACHE) > 2000:
+            _FP_CACHE.clear()
+        _FP_CACHE[key] = fp
+    return fp
+
+
+def _fingerprint(path: Path) -> str:
     try:
         size = path.stat().st_size
         h = hashlib.sha1(str(size).encode())  # noqa: S324 - no criptográfico

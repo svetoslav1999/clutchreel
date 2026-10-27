@@ -23,7 +23,7 @@ from PySide6.QtWidgets import (
 from clutchreel import APP_NAME, __version__
 from clutchreel.core.demo.detectors import detect_all
 from clutchreel.core.demo.models import MatchData
-from clutchreel.core.demo.parser import parse_demo
+from clutchreel.core.demo.parser import parse_demo_cached
 from clutchreel.core.demo.selector import select_by_duration
 from clutchreel.core.editor.project import Project, new_project
 from clutchreel.core.export.exporter import Exporter, ExportResult
@@ -230,7 +230,7 @@ class MainWindow(QMainWindow):
             title = f"Analizar {demo.name}"
 
             def run(progress, cancel, _demo=demo):  # type: ignore[no-untyped-def]
-                return parse_demo(_demo, progress=lambda p, m: progress(p / 100.0, m), cancel=cancel)
+                return parse_demo_cached(_demo, progress=lambda p, m: progress(p / 100.0, m), cancel=cancel)
 
             def done(match: MatchData, _auto: bool = auto) -> None:
                 self._on_analyzed(match, _auto)
