@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import logging
+import os
 import time
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
@@ -43,6 +44,15 @@ def demo_fingerprint(path: Path) -> str:
         return ""
 
 
+def _entry_from_dict(data: Any) -> HistoryEntry | None:
+    if not isinstance(data, dict):
+        return None
+    try:
+        return HistoryEntry(**{k: v for k, v in data.items() if k in HistoryEntry.__dataclass_fields__})
+    except TypeError:  # faltan campos obligatorios
+        return None
+
+
 class History:
     def __init__(self, path: Path | None = None) -> None:
         self.path = path or (appdata_dir() / "history.json")
@@ -54,14 +64,20 @@ class History:
             return
         try:
             raw = json.loads(self.path.read_text(encoding="utf-8"))
-            self.entries = [HistoryEntry(**{k: v for k, v in e.items() if k in HistoryEntry.__dataclass_fields__}) for e in raw]
+            if not isinstance(raw, list):
+                raise ValueError("no es una lista")
+            # Las entradas dañadas se ignoran una a una (antes, una sola impedía abrir la app).
+            self.entries = [entry for entry in (_entry_from_dict(e) for e in raw) if entry is not None]
         except (OSError, ValueError, TypeError) as exc:
             log.warning("Historial ilegible: %s", exc)
             self.entries = []
 
     def save(self) -> None:
+        """Escritura atómica: un corte a mitad no deja el historial vacío ni dañado."""
+        tmp = self.path.with_name(self.path.name + ".tmp")
         try:
-            self.path.write_text(json.dumps([asdict(e) for e in self.entries], ensure_ascii=False, indent=1), encoding="utf-8")
+            tmp.write_text(json.dumps([asdict(e) for e in self.entries], ensure_ascii=False, indent=1), encoding="utf-8")
+            os.replace(tmp, self.path)
         except OSError as exc:
             log.warning("No se pudo guardar el historial: %s", exc)
 

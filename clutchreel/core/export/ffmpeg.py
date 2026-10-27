@@ -222,7 +222,6 @@ class FFmpeg:
         try:
             for line in proc.stdout:
                 if cancel is not None and cancel.is_set():
-                    proc.kill()
                     raise FFmpegError("Cancelado por el usuario.")
                 line = line.strip()
                 if line.startswith("out_time_ms=") or line.startswith("out_time_us="):
@@ -237,10 +236,22 @@ class FFmpeg:
                     progress(1.0, "")
             proc.wait(timeout=timeout)
         except subprocess.TimeoutExpired as exc:
-            proc.kill()
             raise FFmpegError("FFmpeg tardó demasiado y se canceló.") from exc
         finally:
+            # Cancelación, tiempo agotado o un fallo en el aviso de progreso: nunca queda un ffmpeg huérfano.
+            if proc.poll() is None:
+                proc.kill()
+                try:
+                    proc.wait(timeout=10)
+                except subprocess.TimeoutExpired:
+                    log.warning("FFmpeg (pid %s) no terminó tras matarlo", proc.pid)
             thread.join(timeout=2)
+            for stream in (proc.stdout, proc.stderr):
+                try:
+                    if stream is not None:
+                        stream.close()
+                except OSError:
+                    pass
         if proc.returncode != 0:
             tail = "\n".join(stderr_lines[-12:])
             if "No space left" in tail or "not enough space" in tail.lower():

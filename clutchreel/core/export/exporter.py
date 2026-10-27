@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import shutil
+import tempfile
 import threading
 import time
 from collections.abc import Callable
@@ -36,6 +37,18 @@ class ExportResult:
     thumbnail: Path | None
     duration: float
     elapsed: float
+
+
+def _remove_stale_exports(cache: Path, older_than: float = 6 * 3600) -> None:
+    """Borra intermedios de exportaciones que no terminaron (la app se cerró o se colgó a mitad)."""
+    now = time.time()
+    for d in cache.glob("export_*"):
+        try:
+            if d.is_dir() and now - d.stat().st_mtime > older_than:
+                shutil.rmtree(d, ignore_errors=True)
+                log.info("Intermedios antiguos borrados: %s", d.name)
+        except OSError:
+            continue
 
 
 def _clip_source(project: Project, clip: Clip) -> tuple[Path, float] | None:
@@ -88,8 +101,8 @@ class Exporter:
         out_dir.mkdir(parents=True, exist_ok=True)
         if free_disk_bytes(out_dir) < 2_000_000_000:
             raise ExportError("Quedan menos de 2 GB libres en la carpeta de salida. Libera espacio antes de exportar.")
-        work = cache_dir() / f"export_{int(time.time())}"
-        work.mkdir(parents=True, exist_ok=True)
+        _remove_stale_exports(cache_dir())
+        work = Path(tempfile.mkdtemp(prefix="export_", dir=str(cache_dir())))
         try:
             return self._export(project, clips, out_dir, work, report, t0)
         finally:
@@ -197,7 +210,9 @@ class Exporter:
         # 3) Unión -------------------------------------------------------------
         report(0.72, "Uniendo clips…")
         joined = work / "joined.mp4"
-        if style.transitions and style.transition_type != "fade" and style.transition_type != "none" and len(parts) <= 40:
+        use_xfade = style.transitions and style.transition_type not in ("fade", "none") and len(parts) <= 40
+        overlap = b.xfade_duration(part_durs, style.transition_duration) if use_xfade and len(parts) > 1 else 0.0
+        if use_xfade:
             self.ffmpeg.run(
                 b.xfade_command(parts, part_durs, joined, enc, style.transition_type, style.transition_duration),
                 total_duration=sum(part_durs),
@@ -233,11 +248,11 @@ class Exporter:
             best = max(rendered, key=lambda c: c.highlight.score)
             offset = 0.0
             if style.intro_enabled:
-                offset += 3.0
+                offset += 3.0 - overlap  # con xfade cada transición solapa las dos partes
             for c, d in zip(rendered, durations, strict=True):
                 if c is best:
                     break
-                offset += d
+                offset += d - overlap
             key = ticks_to_seconds(best.highlight.key_tick - best.highlight.start_tick, best.effective_tickrate(project.tickrate) if project.recording_mode != "existing" else project.tickrate)
             # Medio segundo después de la última kill: ya se ve la baja (y el marcador con la cuenta final).
             at = min(total - 0.5, offset + max(0.0, key - best.trim_start) + 0.5)

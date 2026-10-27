@@ -16,6 +16,7 @@ from PySide6.QtWidgets import (
     QHBoxLayout,
     QLabel,
     QLineEdit,
+    QMessageBox,
     QPushButton,
     QRadioButton,
     QScrollArea,
@@ -111,6 +112,11 @@ class WizardPage(QWidget):
         hint = QLabel("Se detecta automáticamente con tu cuenta de Steam. Doble clic para elegir otro.")
         hint.setObjectName("muted")
         layout.addWidget(hint)
+        self.lbl_player_warning = QLabel("")
+        self.lbl_player_warning.setObjectName("warning")
+        self.lbl_player_warning.setWordWrap(True)
+        self.lbl_player_warning.hide()
+        layout.addWidget(self.lbl_player_warning)
         self.tbl_players = QTableWidget(0, 7)
         self.tbl_players.setHorizontalHeaderLabels(["Jugador", "Equipo", "K", "D", "A", "HS %", "ADR"])
         self.tbl_players.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
@@ -287,9 +293,9 @@ class WizardPage(QWidget):
         stats = {s.steamid64: s for s in compute_stats(match)}
         self.tbl_players.setRowCount(0)
         detected = self._detect_player(match)
-        select_row = 0
-        if not detected:
-            self.lbl_step.setText("No se ha reconocido tu cuenta de Steam en esta demo: elige tu jugador en la lista.")
+        select_row = -1
+        self.lbl_player_warning.setText("No se ha reconocido tu cuenta de Steam en esta demo: elige tu jugador en la lista.")
+        self.lbl_player_warning.setVisible(not detected)
         for row, p in enumerate(match.players):
             s = stats.get(p.steamid64)
             self.tbl_players.insertRow(row)
@@ -303,7 +309,9 @@ class WizardPage(QWidget):
             if p.steamid64 == detected:
                 select_row = row
         self.tbl_players.resizeColumnsToContents()
-        self.tbl_players.selectRow(select_row)
+        self.tbl_players.clearSelection()
+        if select_row >= 0:
+            self.tbl_players.selectRow(select_row)  # sin cuenta reconocida no se preselecciona a nadie
         last = cfg.ui.last_wizard
         if last:
             kinds = last.get("kinds")
@@ -420,7 +428,17 @@ class WizardPage(QWidget):
     def _finish(self) -> None:
         sid, name = self._selected_player()
         if not sid:
+            self.stack.setCurrentIndex(0)
+            self._update_nav()
+            QMessageBox.information(self, "Elige tu jugador", "Selecciona en la lista el jugador del que quieres las jugadas.")
             return
+        if self.rb_existing.isChecked():
+            video = self.edt_existing.text().strip()
+            if not video or not Path(video).is_file():
+                self.stack.setCurrentIndex(self.stack.count() - 1)
+                self._update_nav()
+                QMessageBox.information(self, "Falta el vídeo", "Elige el vídeo de la partida completa (o marca «Automático con OBS»).")
+                return
         kinds = [k for k, cb in self.kind_checks.items() if cb.isChecked()]
         duration = next((n for n, rb in self.duration_radios.items() if rb.isChecked()), "3-5 min")
         style = {

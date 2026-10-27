@@ -6,7 +6,7 @@ import html
 import uuid
 from pathlib import Path
 
-from PySide6.QtCore import QSize, Qt, Signal
+from PySide6.QtCore import QSize, Qt, QTimer, Signal
 from PySide6.QtWidgets import (
     QAbstractItemView,
     QCheckBox,
@@ -51,6 +51,13 @@ class ReviewPage(QWidget):
         self.state = state
         self._current_id: str | None = None
         self._loading = False
+        self._dragging = False  # arrastrando un deslizador: una sola entrada de deshacer por gesto
+        # Guardado agrupado: editar no escribe el proyecto (~100 KB) en disco con cada paso de un deslizador.
+        self._save_timer = QTimer(self)
+        self._save_timer.setSingleShot(True)
+        self._save_timer.setInterval(600)
+        self._save_timer.timeout.connect(self._do_save)
+        self._pending_save: Project | None = None
         root = QVBoxLayout(self)
         root.setContentsMargins(24, 20, 24, 20)
         root.setSpacing(12)
@@ -128,6 +135,8 @@ class ReviewPage(QWidget):
         cg.addWidget(QLabel("Recortar inicio (s)"), 2, 0)
         self.sld_start = QSlider(Qt.Orientation.Horizontal)
         self.sld_start.setRange(0, 100)
+        self.sld_start.sliderPressed.connect(self._begin_drag)
+        self.sld_start.sliderReleased.connect(self._end_drag)
         self.sld_start.valueChanged.connect(self._on_trim_changed)
         self.lbl_start = QLabel("0,0")
         cg.addWidget(self.sld_start, 2, 1, 1, 2)
@@ -135,6 +144,8 @@ class ReviewPage(QWidget):
         cg.addWidget(QLabel("Recortar final (s)"), 3, 0)
         self.sld_end = QSlider(Qt.Orientation.Horizontal)
         self.sld_end.setRange(0, 100)
+        self.sld_end.sliderPressed.connect(self._begin_drag)
+        self.sld_end.sliderReleased.connect(self._end_drag)
         self.sld_end.valueChanged.connect(self._on_trim_changed)
         self.lbl_end = QLabel("0,0")
         cg.addWidget(self.sld_end, 3, 1, 1, 2)
@@ -166,6 +177,8 @@ class ReviewPage(QWidget):
         cg.addWidget(QLabel("Volumen juego"), 7, 0)
         self.sld_vol = QSlider(Qt.Orientation.Horizontal)
         self.sld_vol.setRange(0, 150)
+        self.sld_vol.sliderPressed.connect(self._begin_drag)
+        self.sld_vol.sliderReleased.connect(self._end_drag)
         self.sld_vol.valueChanged.connect(lambda v: self._edit_clip("game_volume", v / 100.0))
         cg.addWidget(self.sld_vol, 7, 1, 1, 3)
         btn_row = QHBoxLayout()
@@ -198,6 +211,8 @@ class ReviewPage(QWidget):
         sg.addWidget(QLabel("Volumen música"), 2, 0)
         self.sld_music = QSlider(Qt.Orientation.Horizontal)
         self.sld_music.setRange(0, 100)
+        self.sld_music.sliderPressed.connect(self._begin_drag)
+        self.sld_music.sliderReleased.connect(self._end_drag)
         self.sld_music.valueChanged.connect(lambda v: self._edit_style("music_volume", v / 100.0))
         sg.addWidget(self.sld_music, 2, 1, 1, 3)
         self.chk_duck = QCheckBox("Bajar la música cuando suena el juego")
@@ -277,10 +292,10 @@ class ReviewPage(QWidget):
         bottom.addWidget(self.lbl_total)
         bottom.addStretch()
         self.btn_record = QPushButton("🎥 Grabar jugadas con OBS")
-        self.btn_record.clicked.connect(self.record_clips.emit)
+        self.btn_record.clicked.connect(self._on_record_clicked)
         self.btn_create = QPushButton("🎬 Crear vídeo")
         self.btn_create.setObjectName("primary")
-        self.btn_create.clicked.connect(self.create_video.emit)
+        self.btn_create.clicked.connect(self._on_create_clicked)
         bottom.addWidget(self.btn_record)
         bottom.addWidget(self.btn_create)
         root.addLayout(bottom)
@@ -292,6 +307,7 @@ class ReviewPage(QWidget):
         return self.state.project
 
     def load_project(self) -> None:
+        self.flush_save()
         p = self.project
         self._loading = True
         self.lst.clear()
@@ -363,6 +379,20 @@ class ReviewPage(QWidget):
                 card.refresh(clip, p.tickrate)
         self._refresh_summary()
 
+    def _refresh_card(self, clip: Clip) -> None:
+        """Repinta solo la tarjeta del clip editado (y el resumen)."""
+        p = self.project
+        if not p:
+            return
+        for i in range(self.lst.count()):
+            item = self.lst.item(i)
+            if item.data(Qt.ItemDataRole.UserRole) == clip.id:
+                card = self.lst.itemWidget(item)
+                if isinstance(card, ClipCard):
+                    card.refresh(clip, p.tickrate)
+                break
+        self._refresh_summary()
+
     def _refresh_summary(self) -> None:
         p = self.project
         if not p:
@@ -376,9 +406,50 @@ class ReviewPage(QWidget):
     # ------------------------------------------------------------ editing ---
 
     def _push_undo(self) -> None:
-        if self.project and not self._loading:
+        if self.project and not self._loading and not (self._dragging and self._drag_pushed):
             self.state.undo.push(self.project)
+            self._drag_pushed = self._dragging
             self._update_undo_buttons()
+
+    _drag_pushed = False
+
+    def _begin_drag(self) -> None:
+        self._dragging = True
+        self._drag_pushed = False
+
+    def _end_drag(self) -> None:
+        self._dragging = False
+        self._drag_pushed = False
+        self.flush_save()
+
+    def _on_record_clicked(self) -> None:
+        self.flush_save()
+        self.record_clips.emit()
+
+    def _on_create_clicked(self) -> None:
+        self.flush_save()
+        self.create_video.emit()
+
+    def _schedule_save(self) -> None:
+        self._pending_save = self.project
+        self._save_timer.start()
+
+    def _do_save(self) -> None:
+        pending, self._pending_save = self._pending_save, None
+        if pending is None:
+            return
+        if pending is self.state.project:
+            self.state.autosave()
+            return
+        try:  # se cambió de proyecto con cambios sin guardar: se guardan en el suyo
+            pending.save()
+        except OSError as exc:
+            self.state.status_message.emit(f"No se pudo guardar el proyecto: {exc}")
+
+    def flush_save(self) -> None:
+        """Guarda ya lo pendiente (antes de grabar/exportar o al cambiar de proyecto)."""
+        self._save_timer.stop()
+        self._do_save()
 
     def _update_undo_buttons(self) -> None:
         self.btn_undo.setEnabled(self.state.undo.can_undo)
@@ -446,8 +517,8 @@ class ReviewPage(QWidget):
         clip.trim_end = self.sld_end.value() / 10.0
         self.lbl_start.setText(f"{clip.trim_start:.1f}")
         self.lbl_end.setText(f"{clip.trim_end:.1f}")
-        self.refresh_cards()
-        self.state.autosave()
+        self._refresh_card(clip)
+        self._schedule_save()
 
     def _edit_clip(self, attr: str, value: object) -> None:
         clip = self._current_clip()
@@ -457,8 +528,8 @@ class ReviewPage(QWidget):
             return
         self._push_undo()
         setattr(clip, attr, value)
-        self.refresh_cards()
-        self.state.autosave()
+        self._refresh_card(clip)
+        self._schedule_save()
 
     def _edit_style(self, attr: str, value: object) -> None:
         p = self.project
@@ -469,7 +540,7 @@ class ReviewPage(QWidget):
         self._push_undo()
         setattr(p.style, attr, value)
         self._refresh_summary()
-        self.state.autosave()
+        self._schedule_save()
 
     def _on_format(self) -> None:
         p = self.project
@@ -480,13 +551,13 @@ class ReviewPage(QWidget):
             self._push_undo()
             p.export_preset = key
             p.style.aspect = "9:16" if key.startswith("shorts") else "16:9"
-            self.state.autosave()
+            self._schedule_save()
 
     def _on_offset(self, value: float) -> None:
         p = self.project
         if p and not self._loading and p.existing_recording_offset != value:
             p.existing_recording_offset = value
-            self.state.autosave()
+            self._schedule_save()
 
     def _on_toggle(self, clip_id: str, enabled: bool) -> None:
         p = self.project
@@ -497,7 +568,7 @@ class ReviewPage(QWidget):
             self._push_undo()
             clip.enabled = enabled
             self._refresh_summary()
-            self.state.autosave()
+            self._schedule_save()
 
     def _toggle_all(self, enabled: bool) -> None:
         p = self.project
@@ -507,7 +578,7 @@ class ReviewPage(QWidget):
         for c in p.clips:
             c.enabled = enabled
         self.refresh_cards()
-        self.state.autosave()
+        self._schedule_save()
 
     def _on_rows_moved(self, *_args: object) -> None:
         p = self.project
@@ -517,7 +588,7 @@ class ReviewPage(QWidget):
         ids = [self.lst.item(i).data(Qt.ItemDataRole.UserRole) for i in range(self.lst.count())]
         by_id = {c.id: c for c in p.clips}
         p.clips = [by_id[i] for i in ids if i in by_id]
-        self.state.autosave()
+        self._schedule_save()
 
     def _reorder(self, mode: str) -> None:
         p = self.project
@@ -529,7 +600,7 @@ class ReviewPage(QWidget):
         order = {id(h): i for i, h in enumerate(hls)}
         p.clips.sort(key=lambda c: order.get(id(c.highlight), 0))
         self.load_project()
-        self.state.autosave()
+        self._schedule_save()
 
     def _duplicate(self) -> None:
         p = self.project
@@ -543,7 +614,7 @@ class ReviewPage(QWidget):
         p.clips.insert(idx, new)
         self.load_project()
         self.lst.setCurrentRow(idx)
-        self.state.autosave()
+        self._schedule_save()
 
     def _delete(self) -> None:
         p = self.project
@@ -553,7 +624,7 @@ class ReviewPage(QWidget):
         self._push_undo()
         p.clips.remove(clip)
         self.load_project()
-        self.state.autosave()
+        self._schedule_save()
 
     def _preview_clip(self) -> None:
         p = self.project

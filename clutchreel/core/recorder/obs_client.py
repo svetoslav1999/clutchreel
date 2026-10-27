@@ -10,16 +10,21 @@ from __future__ import annotations
 import base64
 import logging
 import subprocess
+import threading
 import time
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 from clutchreel.services.config import ObsSettings
+from clutchreel.utils.logging_setup import register_secret
 from clutchreel.utils.paths import obs_exe, obs_websocket_config
 from clutchreel.utils.winutil import is_process_running
 
 log = logging.getLogger(__name__)
+# obsws-python registra en INFO los parámetros de conexión, contraseña incluida («Connecting with parameters:
+# … password='…'»). Se silencia aquí, no solo en setup_logging, para que ningún uso del cliente la filtre.
+logging.getLogger("obsws_python").setLevel(logging.WARNING)
 
 CS2_WINDOW = "Counter-Strike 2:SDL_app:cs2.exe"
 # Formatos de OBS que FFmpeg corta sin problema; con cualquiera de ellos no se toca la configuración del usuario.
@@ -78,6 +83,7 @@ class ObsClient:
         self.settings = settings
         self.obs_path = obs_path
         self._client: Any = None
+        self.cancel: threading.Event | None = None  # lo fija el grabador para cortar la espera al abrir OBS
 
     # ------------------------------------------------------------ connect ---
 
@@ -90,6 +96,7 @@ class ObsClient:
             import obsws_python as obs
         except ImportError as exc:  # pragma: no cover
             raise ObsError("Falta la librería obsws-python. Ejecuta Iniciar.bat.") from exc
+        register_secret(self.settings.password)
         try:
             self._client = obs.ReqClient(
                 host=self.settings.host, port=int(self.settings.port), password=self.settings.password or "", timeout=timeout
@@ -157,6 +164,8 @@ class ObsClient:
         last_error = ""
         while time.time() < deadline:
             time.sleep(1.5)
+            if self.cancel is not None and self.cancel.is_set():
+                raise ObsError("Grabación cancelada.")
             try:
                 self.connect(timeout=2.0)
                 return

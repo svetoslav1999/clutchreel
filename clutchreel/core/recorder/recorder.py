@@ -21,6 +21,7 @@ from clutchreel.core.recorder.spectate import DemoTimeline, PlaybackCheck, Spect
 from clutchreel.services.config import AppConfig
 from clutchreel.utils.paths import safe_filename
 from clutchreel.utils.timeutil import seconds_to_ticks, ticks_to_seconds
+from clutchreel.utils.winutil import free_disk_bytes
 
 log = logging.getLogger(__name__)
 
@@ -33,6 +34,7 @@ POST_PAD = 0.8
 # cambia la cámara a él (spec_freeze_deathanim_time / spec_freeze_time; medido en CS2 1.41.9).
 DEATH_PAD = 0.8
 SAMPLE_PERIOD = 0.7  # cada cuánto se pregunta la posición de la cámara durante la grabación
+MIN_FREE_BYTES = 2_000_000_000  # una jugada a 1080p60 ocupa ~25 MB/s en OBS; sin margen el clip sale cortado
 
 
 class RecorderError(Exception):
@@ -149,6 +151,9 @@ class Recorder:
 
     def prepare(self, status: StatusFn) -> tuple[str, str]:
         """Conecta OBS (lanzándolo si procede), prepara escena, lanza CS2 y conecta consola."""
+        # ``cancel`` puede haberse sustituido tras construir el grabador (lo hace la cola de trabajos).
+        self.cs2.cancel = self.cancel
+        self.obs.cancel = self.cancel
         status("Conectando con OBS…", 0.02)
         try:
             self.obs.ensure_connected(allow_launch=self.config.obs.auto_launch)
@@ -163,6 +168,11 @@ class Recorder:
             except Exception as exc:
                 raise RecorderError(f"No se pudo preparar la escena de OBS: {exc}") from exc
         rec_dir = Path(self.config.paths.output_folder) / "grabaciones"
+        if free_disk_bytes(rec_dir) < MIN_FREE_BYTES:
+            raise RecorderError(
+                f"Quedan menos de {MIN_FREE_BYTES // 1_000_000_000} GB libres en {rec_dir.anchor or rec_dir}. "
+                "Libera espacio o cambia la carpeta de salida en Ajustes → Rutas antes de grabar."
+            )
         try:
             self.obs.apply_recording_settings(rec_dir)
         except Exception as exc:  # noqa: BLE001
@@ -429,52 +439,57 @@ class Recorder:
 
         status("Grabando…", base + span * 0.25)
         self.obs.start_record()
-        t_rec = time.perf_counter()
-        time.sleep(0.6)
-        n_changes_before = len(self.cs2.camera_changes)
-        # Se reproducen exactamente los ticks del clip (+ margen final): CS2 pausa solo al llegar y lo
-        # anuncia por la consola. Así el final no depende de la velocidad real de reproducción.
-        play_ticks = (plan.end_tick - plan.start_tick) + seconds_to_ticks(POST_PAD, tickrate)
-        self.cs2.play_ticks(play_ticks)
-        t_resume = time.perf_counter()
-        nominal_wait = ticks_to_seconds(play_ticks, tickrate)
-        deadline = t_resume + nominal_wait * 1.6 + 6.0  # por si CS2 no anuncia la pausa
-        samples: list[tuple[float, tuple[float, float, float]]] = []
-        next_sample = t_resume + 0.4
-        paused: tuple[float, int | None] | None = None
-        while time.perf_counter() < deadline:
-            if self.cancel.is_set():
-                self.obs.stop_record()
-                raise RecorderError("Grabación cancelada.")
-            if not self.cs2.is_running():
-                self.obs.stop_record()
-                raise Cs2Error("CS2 se cerró durante la grabación.")
-            now = time.perf_counter()
-            if self.cs2.can_read_console and now >= next_sample:
-                pos = self.cs2.camera_position()
-                if pos is not None:
-                    samples.append(((now + time.perf_counter()) / 2.0, pos))  # getpos tarda: se usa el instante medio
-                next_sample = now + SAMPLE_PERIOD
-            paused = self.cs2.pause_after(t_resume + 0.2)
-            if paused is not None:
-                break
-            elapsed = time.perf_counter() - t_resume
-            status(f"Grabando… {elapsed:.0f}/{nominal_wait:.0f} s", base + span * (0.25 + 0.6 * min(1.0, elapsed / nominal_wait)))
-            time.sleep(0.05)
-        latency = float(cs2.command_latency)
-        if paused is None:
-            self.cs2.pause()
-            rate = tickrate
-            log.warning("CS2 no anunció la pausa al final del clip; se usa el tickrate nominal (%.0f)", tickrate)
-        else:
-            t_pause, demo_tick = paused
-            rate = play_ticks / max(0.5, t_pause - t_resume - latency)
-            if not (0.5 * tickrate <= rate <= 1.5 * tickrate):
-                log.warning("Velocidad de reproducción medida fuera de rango (%.1f ticks/s); se usa %.0f", rate, tickrate)
+        try:
+            t_rec = time.perf_counter()
+            time.sleep(0.6)
+            n_changes_before = len(self.cs2.camera_changes)
+            # Se reproducen exactamente los ticks del clip (+ margen final): CS2 pausa solo al llegar y lo
+            # anuncia por la consola. Así el final no depende de la velocidad real de reproducción.
+            play_ticks = (plan.end_tick - plan.start_tick) + seconds_to_ticks(POST_PAD, tickrate)
+            self.cs2.play_ticks(play_ticks)
+            t_resume = time.perf_counter()
+            nominal_wait = ticks_to_seconds(play_ticks, tickrate)
+            deadline = t_resume + nominal_wait * 1.6 + 6.0  # por si CS2 no anuncia la pausa
+            samples: list[tuple[float, tuple[float, float, float]]] = []
+            next_sample = t_resume + 0.4
+            paused: tuple[float, int | None] | None = None
+            last_status = -1
+            while time.perf_counter() < deadline:
+                if self.cancel.is_set():
+                    raise RecorderError("Grabación cancelada.")
+                if not self.cs2.is_running():
+                    raise Cs2Error("CS2 se cerró durante la grabación.")
+                now = time.perf_counter()
+                if self.cs2.can_read_console and now >= next_sample:
+                    pos = self.cs2.camera_position()
+                    if pos is not None:
+                        samples.append(((now + time.perf_counter()) / 2.0, pos))  # getpos tarda: se usa el instante medio
+                    next_sample = now + SAMPLE_PERIOD
+                paused = self.cs2.pause_after(t_resume + 0.2)
+                if paused is not None:
+                    break
+                elapsed = time.perf_counter() - t_resume
+                if int(elapsed) != last_status:  # un aviso por segundo basta (antes, 20 por segundo)
+                    last_status = int(elapsed)
+                    status(f"Grabando… {elapsed:.0f}/{nominal_wait:.0f} s", base + span * (0.25 + 0.6 * min(1.0, elapsed / nominal_wait)))
+                time.sleep(0.05)
+            latency = float(cs2.command_latency)
+            if paused is None:
+                self.cs2.pause()
                 rate = tickrate
-            log.info("Clip reproducido a %.1f ticks/s (nominal %.0f); CS2 pausó en el tick de demo %s", rate, tickrate, demo_tick)
-        time.sleep(0.3)
-        path = self.obs.stop_record()
+                log.warning("CS2 no anunció la pausa al final del clip; se usa el tickrate nominal (%.0f)", tickrate)
+            else:
+                t_pause, demo_tick = paused
+                rate = play_ticks / max(0.5, t_pause - t_resume - latency)
+                if not (0.5 * tickrate <= rate <= 1.5 * tickrate):
+                    log.warning("Velocidad de reproducción medida fuera de rango (%.1f ticks/s); se usa %.0f", rate, tickrate)
+                    rate = tickrate
+                log.info("Clip reproducido a %.1f ticks/s (nominal %.0f); CS2 pausó en el tick de demo %s", rate, tickrate, demo_tick)
+            time.sleep(0.3)
+            path = self.obs.stop_record()
+        except BaseException:
+            self._abort_recording()
+            raise
         if path is None:
             raise ObsError("OBS no devolvió la ruta de la grabación.")
         pre_pad = ticks_to_seconds(plan.pre_pad_ticks, rate)
@@ -506,6 +521,16 @@ class Recorder:
         job.result = final_path
         job.error = ""
         log.info("Clip %s grabado en %s (offset %.2f s, %.1f ticks/s, cámara: %s)", clip.id, final_path, offset, rate, clip.camera_note)
+
+    def _abort_recording(self) -> None:
+        """Para la grabación que quedó a medias (fallo o cancelación) y borra su fichero incompleto."""
+        try:
+            if self.obs.connected and self.obs.is_recording():
+                partial = self.obs.stop_record()
+                if partial is not None:
+                    self._discard(partial)
+        except Exception as exc:  # noqa: BLE001
+            log.warning("No se pudo parar la grabación interrumpida: %s", exc)
 
     @staticmethod
     def _discard(path: Path) -> None:
@@ -558,13 +583,17 @@ class Recorder:
             time.sleep(1.0)
             status("Grabando clip de prueba (6 s)…", 0.6)
             self.obs.start_record()
-            t_rec = time.perf_counter()
-            time.sleep(1.5)
-            self.cs2.resume()
-            t_resume = time.perf_counter()
-            time.sleep(6.0)
-            self.cs2.pause()
-            path = self.obs.stop_record()
+            try:
+                t_rec = time.perf_counter()
+                time.sleep(1.5)
+                self.cs2.resume()
+                t_resume = time.perf_counter()
+                time.sleep(6.0)
+                self.cs2.pause()
+                path = self.obs.stop_record()
+            except BaseException:
+                self._abort_recording()
+                raise
             if path is None:
                 raise RecorderError("OBS no devolvió la ruta del clip de prueba.")
             status("Analizando el clip…", 0.85)

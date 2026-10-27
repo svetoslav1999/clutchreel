@@ -18,6 +18,7 @@ import logging
 import math
 import os
 import re
+import threading
 from collections.abc import Callable
 from pathlib import Path
 from typing import Any
@@ -111,12 +112,17 @@ def quick_validate(path: Path) -> None:
         raise DemoError("El archivo no tiene cabecera de demo de CS2 (puede estar corrupto).")
 
 
-def parse_demo(path: str | os.PathLike[str], progress: ProgressFn | None = None) -> MatchData:
-    """Analiza la demo completa. Lanza :class:`DemoError` con mensajes claros."""
+def parse_demo(path: str | os.PathLike[str], progress: ProgressFn | None = None, cancel: threading.Event | None = None) -> MatchData:
+    """Analiza la demo completa. Lanza :class:`DemoError` con mensajes claros.
+
+    ``cancel`` se comprueba entre etapas (demoparser2 no se puede interrumpir a mitad de una lectura).
+    """
     demo_path = Path(path)
     quick_validate(demo_path)
 
     def report(pct: int, msg: str) -> None:
+        if cancel is not None and cancel.is_set():
+            raise DemoError("Análisis cancelado.")
         if progress:
             progress(pct, msg)
 
@@ -217,7 +223,7 @@ def parse_demo(path: str | os.PathLike[str], progress: ProgressFn | None = None)
         if _safe_bool(row.get("is_warmup_period")):
             continue
         tick = _safe_int(row.get("tick"))
-        round_number = _round_for_tick(rounds, tick)
+        round_number = _round_for_tick(rounds, tick, tickrate)
         if round_number == 0:
             continue
         attacker = _safe_int(row.get("attacker_steamid"))
@@ -316,13 +322,13 @@ def parse_demo(path: str | os.PathLike[str], progress: ProgressFn | None = None)
     return match
 
 
-def _round_for_tick(rounds: list[RoundInfo], tick: int) -> int:
+def _round_for_tick(rounds: list[RoundInfo], tick: int, tickrate: float = DEFAULT_TICKRATE) -> int:
     for r in rounds:
         if r.start_tick <= tick <= r.end_tick:
             return r.number
     # Bajas justo tras round_end (antes de round_start siguiente) cuentan en esa ronda.
     for r in rounds:
-        if r.end_tick < tick and tick <= r.end_tick + 7 * 64:
+        if r.end_tick < tick and tick <= r.end_tick + round(7 * tickrate):  # 7 s, también en demos de 128 ticks
             return r.number
     return 0
 

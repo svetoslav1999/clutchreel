@@ -71,6 +71,10 @@ class MainWindow(QMainWindow):
         self._pending_matches: list[MatchData] = []
         self._auto_pipeline: dict[str, Any] = {}
         self._quitting = False
+        self._cards_timer = QTimer(self)
+        self._cards_timer.setSingleShot(True)
+        self._cards_timer.setInterval(1000)
+        self._cards_timer.timeout.connect(self._refresh_cards)
         self.setWindowTitle(f"{APP_NAME} {__version__}")
         self.setWindowIcon(icon)
         self.resize(1280, 820)
@@ -191,6 +195,12 @@ class MainWindow(QMainWindow):
         cur = self.queue.current
         if cur:
             self.statusBar().showMessage(f"{cur.title}: {cur.message} ({cur.progress}%)")
+        # Las tarjetas reflejan el estado de grabación de cada clip; con refrescarlas una vez por segundo
+        # basta (antes se repintaban todas con cada aviso de progreso).
+        if not self._cards_timer.isActive():
+            self._cards_timer.start()
+
+    def _refresh_cards(self) -> None:
         self.review.refresh_cards()
 
     def _on_job_failed(self, job: Job) -> None:
@@ -209,6 +219,7 @@ class MainWindow(QMainWindow):
     # ------------------------------------------------------- analyze --------
 
     def analyze_demos(self, demos: list[Path], auto: bool = False) -> None:
+        queued = 0
         for demo in demos:
             prev = self.state.history.find(demo)
             if prev and not auto:
@@ -219,13 +230,15 @@ class MainWindow(QMainWindow):
             title = f"Analizar {demo.name}"
 
             def run(progress, cancel, _demo=demo):  # type: ignore[no-untyped-def]
-                return parse_demo(_demo, progress=lambda p, m: progress(p / 100.0, m))
+                return parse_demo(_demo, progress=lambda p, m: progress(p / 100.0, m), cancel=cancel)
 
             def done(match: MatchData, _auto: bool = auto) -> None:
                 self._on_analyzed(match, _auto)
 
             self.queue.add("analizar", title, run, on_done=done)
-        self.go(3)
+            queued += 1
+        if queued:  # si solo se abrieron proyectos anteriores, se queda en Revisión
+            self.go(3)
 
     def _on_analyzed(self, match: MatchData, auto: bool) -> None:
         if auto:
@@ -300,7 +313,7 @@ class MainWindow(QMainWindow):
     def open_project(self, path: str) -> None:
         try:
             project = Project.load(Path(path))
-        except (OSError, ValueError) as exc:
+        except (OSError, ValueError, TypeError, AttributeError, KeyError) as exc:  # fichero dañado o de otra cosa
             dialogs.show_error(self, "No se pudo abrir el proyecto", str(exc))
             return
         self.state.set_project(project)
@@ -544,10 +557,16 @@ class MainWindow(QMainWindow):
         self.state.pool.cancel_all()
         if self.watcher:
             self.watcher.stop()
+        self.review.flush_save()
         self.state.autosave()
         cfg.ui.window_geometry = bytes(self.saveGeometry().toBase64().data()).decode("ascii")
         self.state.save()
-        self.state.pool.wait_all(6000)
+        if self.state.pool.busy:
+            # Una grabación cancelada todavía tiene que parar OBS y devolver CS2 a su estado: se le da tiempo
+            # (antes, a los 6 s la app salía y OBS se quedaba grabando).
+            self.statusBar().showMessage("Cancelando el trabajo en curso (parando OBS y restaurando CS2)…")
+            self.setEnabled(False)
+            self.state.pool.wait_all(45000, keep_alive=QApplication.processEvents)
         if self.tray is not None:
             self.tray.hide()
         event.accept()

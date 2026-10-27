@@ -50,6 +50,10 @@ QLabel#subtitle {{
 QLabel#muted {{
     color: {TEXT_MUTED};
 }}
+QLabel#warning {{
+    color: {ACCENT};
+    font-weight: 600;
+}}
 QLabel#badge {{
     background: {ACCENT};
     color: #1a1a1a;

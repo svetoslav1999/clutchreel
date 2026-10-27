@@ -25,6 +25,7 @@ import re
 import shutil
 import socket
 import subprocess
+import threading
 import time
 from collections.abc import Callable
 from pathlib import Path
@@ -204,6 +205,12 @@ class Cs2Controller:
         # Pausas anunciadas por CS2: (momento perf_counter, tick de motor, tick de demo o None).
         self.pauses: list[tuple[float, int, int | None]] = []
         self._tail = ""  # cola del último texto leído, por si una línea llega partida en dos lecturas
+        # Lo fija el grabador: las esperas largas (arranque, carga, saltos) terminan en cuanto se cancela.
+        self.cancel: threading.Event | None = None
+
+    def _check_cancel(self) -> None:
+        if self.cancel is not None and self.cancel.is_set():
+            raise Cs2Error("Grabación cancelada.")
 
     # ------------------------------------------------------------- camera ---
 
@@ -324,6 +331,7 @@ class Cs2Controller:
             raise Cs2Error(f"No se pudo lanzar CS2 mediante Steam: {exc}") from exc
         deadline = time.time() + wait_seconds
         while time.time() < deadline:
+            self._check_cancel()
             if self.is_running():
                 log.info("Proceso cs2.exe detectado")
                 return
@@ -351,6 +359,7 @@ class Cs2Controller:
         elif self.settings.use_netconport:
             deadline = time.time() + wait_seconds
             while time.time() < deadline:
+                self._check_cancel()
                 if not self.is_running():
                     raise Cs2Error("CS2 se cerró antes de poder conectar con su consola.")
                 if self.netcon.connect():
@@ -358,6 +367,7 @@ class Cs2Controller:
                     # Recién lanzado, CS2 tarda en llegar al menú (hasta ~1 min en frío).
                     echo_deadline = time.time() + max(45.0, deadline - time.time())
                     while not self.netcon.probe_echo() and time.time() < echo_deadline:
+                        self._check_cancel()
                         time.sleep(1.0)
                     self.channel = "netcon"
                     log.info("Consola de CS2 conectada por puerto %d (eco=%s)", self.settings.netcon_port, self.netcon.echo_works)
@@ -382,6 +392,7 @@ class Cs2Controller:
             return
         deadline = time.time() + 30.0
         while time.time() < deadline:
+            self._check_cancel()
             if not self.is_running():
                 raise Cs2Error("CS2 se cerró.")
             if self.netcon.connect():
@@ -579,6 +590,7 @@ class Cs2Controller:
             return self.can_read_console
         deadline = time.time() + timeout
         while time.time() < deadline:
+            self._check_cancel()
             if not self.is_running():
                 raise Cs2Error("CS2 se cerró antes de poder leer su consola.")
             self._ensure_netcon()
@@ -607,6 +619,7 @@ class Cs2Controller:
             deadline = time.time() + max(wait, 120.0)
             buf = ""
             while time.time() < deadline:
+                self._check_cancel()
                 if not self.is_running():
                     raise Cs2Error("CS2 se cerró mientras cargaba la demo.")
                 if not self.netcon.connected:
@@ -632,6 +645,7 @@ class Cs2Controller:
         log.info("Esperando %.0f s a que cargue la demo", wait)
         deadline = time.time() + wait
         while time.time() < deadline:
+            self._check_cancel()
             if not self.is_running():
                 raise Cs2Error("CS2 se cerró mientras cargaba la demo.")
             time.sleep(0.5)
@@ -641,6 +655,7 @@ class Cs2Controller:
         buf = already
         deadline = time.time() + INITIAL_SKIP_WAIT
         while time.time() < deadline and not _SEEK_DONE_RE.search(buf):
+            self._check_cancel()
             if not self.is_running():
                 raise Cs2Error("CS2 se cerró mientras cargaba la demo.")
             buf = (buf + self.netcon.read(0.2, 0.6))[-100_000:]
@@ -678,6 +693,7 @@ class Cs2Controller:
             buf = ""
             deadline = time.time() + max(20.0, wait * 3)
             while time.time() < deadline and reached is None:
+                self._check_cancel()
                 if not self.is_running():
                     raise Cs2Error("CS2 se cerró durante la búsqueda en la demo.")
                 buf = (buf + self.netcon.read(0.2, 0.6))[-100_000:]
@@ -690,9 +706,12 @@ class Cs2Controller:
             log.warning("CS2 no confirmó el salto al tick %d (intento %d)", tick, attempt)
             if not self.responsive():
                 raise Cs2Error("CS2 no responde por la consola (¿se ha quedado colgado?).")
-        else:
+        if reached is None:
+            # Sin confirmación (consola no legible o CS2 no la imprimió) se espera el tiempo configurado. (Antes este bloque
+            # colgaba de un for…else que el «break» anterior se saltaba: se grababa sin esperar al salto.)
             deadline = time.time() + wait
             while time.time() < deadline:
+                self._check_cancel()
                 if not self.is_running():
                     raise Cs2Error("CS2 se cerró durante la búsqueda en la demo.")
                 time.sleep(0.25)

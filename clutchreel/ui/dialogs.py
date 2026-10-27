@@ -19,7 +19,7 @@ from PySide6.QtWidgets import (
 )
 
 from clutchreel.services.config import AppConfig, ConfigStore
-from clutchreel.services.diagnostics import diagnostics_text, run_diagnostics
+from clutchreel.services.diagnostics import CheckResult, diagnostics_text, run_diagnostics
 from clutchreel.services.obs_setup import OBS_AUTOCONFIG_ACTION, ObsSetupError, SetupResult, configure_obs
 from clutchreel.utils.logging_setup import build_error_report, log_file_path, read_log_tail
 from clutchreel.utils.paths import open_in_explorer
@@ -40,6 +40,23 @@ class _ObsSetupThread(QThread):
             self.finished_setup.emit(None, str(exc))
         except Exception as exc:  # noqa: BLE001
             self.finished_setup.emit(None, f"Error inesperado: {exc}")
+
+
+class _DiagnosticsThread(QThread):
+    """Diagnóstico fuera del hilo de la interfaz: prueba codificadores con FFmpeg y tarda unos segundos."""
+
+    done = Signal(object)  # list[CheckResult]
+
+    def __init__(self, config: AppConfig, parent: QWidget | None = None) -> None:
+        super().__init__(parent)
+        self.config = config
+
+    def run(self) -> None:
+        try:
+            results = run_diagnostics(self.config)
+        except Exception as exc:  # noqa: BLE001
+            results = [CheckResult("Diagnóstico", False, f"No se pudo completar: {exc}")]
+        self.done.emit(results)
 
 
 def run_obs_autoconfig(parent: QWidget | None, store: ConfigStore) -> bool:
@@ -105,7 +122,8 @@ class DiagnosticsDialog(QDialog):
         self.text.setReadOnly(True)
         layout.addWidget(self.text, 1)
         row = QHBoxLayout()
-        btn_again = QPushButton("Volver a comprobar")
+        self._thread: _DiagnosticsThread | None = None
+        self.btn_again = btn_again = QPushButton("Volver a comprobar")
         btn_again.clicked.connect(lambda: self.run(config))
         self.btn_fix_obs = QPushButton("Configurar OBS automáticamente")
         self.btn_fix_obs.clicked.connect(self._fix_obs)
@@ -123,13 +141,25 @@ class DiagnosticsDialog(QDialog):
         self.run(config)
 
     def run(self, config: AppConfig) -> None:
-        self.text.setPlainText("Comprobando…")
-        QApplication.processEvents()
-        results = run_diagnostics(config)
+        if self._thread is not None and self._thread.isRunning():
+            return
+        self.text.setPlainText("Comprobando… (unos segundos: se prueba el codificador de vídeo)")
+        self.btn_again.setEnabled(False)
+        self._thread = _DiagnosticsThread(config, self)
+        self._thread.done.connect(self._show)
+        self._thread.start()
+
+    def _show(self, results: list[CheckResult]) -> None:
+        self.btn_again.setEnabled(True)
         missing = [r for r in results if not r.ok and not r.warning]
         head = "Todo listo para crear vídeos." if not missing else f"Faltan {len(missing)} cosas por resolver:"
         self.text.setPlainText(head + "\n\n" + diagnostics_text(results))
         self.btn_fix_obs.setVisible(self.store is not None and any(r.fix_action == OBS_AUTOCONFIG_ACTION for r in results))
+
+    def done(self, result: int) -> None:
+        if self._thread is not None and self._thread.isRunning():
+            self._thread.wait(60000)  # no destruir el hilo a medias
+        super().done(result)
 
     def _fix_obs(self) -> None:
         if self.store is not None and run_obs_autoconfig(self, self.store):
@@ -218,5 +248,12 @@ class FirstRunDialog(QDialog):
         buttons.button(QDialogButtonBox.StandardButton.Ok).setText("Empezar")
         buttons.accepted.connect(self.accept)
         layout.addWidget(buttons)
-        results = run_diagnostics(config)
-        self.text.setPlainText(diagnostics_text(results))
+        self.text.setPlainText("Comprobando tu PC…")
+        self._thread = _DiagnosticsThread(config, self)
+        self._thread.done.connect(lambda results: self.text.setPlainText(diagnostics_text(results)))
+        self._thread.start()
+
+    def done(self, result: int) -> None:
+        if self._thread.isRunning():
+            self._thread.wait(60000)  # no destruir el hilo a medias
+        super().done(result)

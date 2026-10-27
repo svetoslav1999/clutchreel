@@ -9,6 +9,7 @@ from clutchreel.core.export.ffmpeg import FFmpeg
 from clutchreel.services.config import AppConfig, ConfigStore, get_store, save_config
 from clutchreel.services.history import History
 from clutchreel.ui.workers import WorkerPool
+from clutchreel.utils.logging_setup import register_secret
 
 
 class AppState(QObject):
@@ -24,12 +25,14 @@ class AppState(QObject):
         self.undo = UndoStack()
         self.pool = WorkerPool()
         self.ffmpeg = FFmpeg(self.config.paths.ffmpeg_path)
+        register_secret(self.config.obs.password)
 
     @property
     def config(self) -> AppConfig:
         return self.store.config
 
     def save(self) -> None:
+        register_secret(self.config.obs.password)  # por si se cambió en Ajustes
         save_config()
         self.ffmpeg = FFmpeg(self.config.paths.ffmpeg_path)
         self.config_changed.emit()

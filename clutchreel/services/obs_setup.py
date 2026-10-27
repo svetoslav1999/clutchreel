@@ -24,6 +24,7 @@ from pathlib import Path
 from typing import Any
 
 from clutchreel.services.config import ConfigStore
+from clutchreel.utils.logging_setup import register_secret
 from clutchreel.utils.paths import obs_exe
 from clutchreel.utils.winutil import find_process, is_process_running
 
@@ -228,6 +229,7 @@ def configure_obs(
     preferred = state.port if state.exists and not state.corrupt else 4455
     port = pick_port(preferred)
     password = generate_password()
+    register_secret(password)
     backup = apply_websocket_config(ws_config, port, password)
     store.config.obs.port = port
     store.config.obs.password = password

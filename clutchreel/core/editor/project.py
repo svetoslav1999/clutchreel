@@ -215,6 +215,8 @@ class Project:
     @staticmethod
     def load(path: Path) -> Project:
         data = json.loads(Path(path).read_text(encoding="utf-8"))
+        if not isinstance(data, dict):
+            raise ValueError("El fichero no es un proyecto de ClutchReel.")
         return Project.from_dict(data, path=str(path))
 
     def snapshot(self) -> dict[str, Any]:

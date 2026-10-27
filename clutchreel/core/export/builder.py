@@ -264,6 +264,11 @@ def concat_command(list_file: Path, output: Path) -> list[str]:
     return ["-f", "concat", "-safe", "0", "-i", str(list_file), "-c", "copy", "-movflags", "+faststart", str(output)]
 
 
+def xfade_duration(durations: list[float], t_dur: float) -> float:
+    """Duración real de cada transición ``xfade`` (nunca más de media parte más corta)."""
+    return max(0.1, min(t_dur, min(durations) / 2 - 0.05))
+
+
 def xfade_command(inputs: list[Path], durations: list[float], output: Path, enc: EncodeSettings, transition: str = "fade", t_dur: float = 0.4) -> list[str]:
     """Unión con transiciones ``xfade``/``acrossfade`` (recodifica)."""
     if len(inputs) != len(durations) or not inputs:
@@ -274,7 +279,7 @@ def xfade_command(inputs: list[Path], durations: list[float], output: Path, enc:
     if len(inputs) == 1:
         return [*args, "-c", "copy", str(output)]
     filters: list[str] = []
-    t_dur = max(0.1, min(t_dur, min(durations) / 2 - 0.05))
+    t_dur = xfade_duration(durations, t_dur)
     prev_v, prev_a = "[0:v]", "[0:a]"
     offset = 0.0
     for i in range(1, len(inputs)):
