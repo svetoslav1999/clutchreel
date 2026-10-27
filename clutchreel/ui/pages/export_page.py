@@ -182,6 +182,8 @@ class ExportPage(QWidget):
         self.edt_title.setText(title)
         self.txt_desc.setPlainText(description)
         self.edt_tags.setText(", ".join(tags))
+        self.edt_title.setCursorPosition(0)  # que se vea el principio, no el final
+        self.edt_tags.setCursorPosition(0)
         self.preview.load(video, autoplay=False)
         self.refresh()
 

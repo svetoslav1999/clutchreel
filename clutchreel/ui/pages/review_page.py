@@ -137,11 +137,15 @@ class ReviewPage(QWidget):
 
         clip_box = QFrame()
         clip_box.setObjectName("panel")
-        cg = QGridLayout(clip_box)
-        cg.addWidget(_section("Clip seleccionado"), 0, 0, 1, 4)
+        # El texto del clip va en una caja vertical, fuera de la rejilla: con varias líneas la rejilla le
+        # daba menos alto del que necesitaba y se montaba sobre la fila siguiente.
+        clip_v = QVBoxLayout(clip_box)
+        clip_v.addWidget(_section("Clip seleccionado"))
         self.lbl_clip = QLabel("—")
         self.lbl_clip.setWordWrap(True)
-        cg.addWidget(self.lbl_clip, 1, 0, 1, 4)
+        clip_v.addWidget(self.lbl_clip)
+        cg = QGridLayout()
+        clip_v.addLayout(cg)
         cg.addWidget(QLabel("Recortar inicio (s)"), 2, 0)
         self.sld_start = QSlider(Qt.Orientation.Horizontal)
         self.sld_start.setRange(0, 100)
