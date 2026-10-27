@@ -127,14 +127,14 @@ if sys.platform == "win32":
         time.sleep(0.3)
         return bool(_user32.GetForegroundWindow() == hwnd)
 
-    def minimize_window(title_contains: str, exe_name: str = "cs2.exe") -> bool:
-        """Minimiza la ventana (sin cerrar el programa). ``True`` si estaba y se minimizó."""
-        hwnd = find_window(title_contains, exe_name)
-        if hwnd is None:
-            return False
-        if not _user32.IsIconic(hwnd):
-            _user32.ShowWindow(hwnd, 6)  # SW_MINIMIZE
-        return True
+    def bring_to_front(hwnd: int) -> bool:
+        """Pone en primer plano una ventana propia (p. ej. ClutchReel) con el mismo truco que ``focus_window``."""
+        if _user32.IsIconic(hwnd):
+            _user32.ShowWindowAsync(hwnd, 9)  # SW_RESTORE, sin esperar a la ventana
+        _user32.keybd_event(0x12, 0, 0, 0)
+        _user32.keybd_event(0x12, 0, KEYEVENTF_KEYUP, 0)
+        _user32.SetForegroundWindow(hwnd)
+        return bool(_user32.GetForegroundWindow() == hwnd)
 
 else:  # pragma: no cover - solo Windows
 
@@ -147,5 +147,5 @@ else:  # pragma: no cover - solo Windows
     def focus_window(title_contains: str, exe_name: str = "cs2.exe") -> bool:
         return False
 
-    def minimize_window(title_contains: str, exe_name: str = "cs2.exe") -> bool:
+    def bring_to_front(hwnd: int) -> bool:
         return False

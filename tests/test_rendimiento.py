@@ -7,7 +7,6 @@ from pathlib import Path
 from typing import Any
 
 import pandas as pd
-import pytest
 
 from clutchreel.core.demo import parser as parser_mod
 from clutchreel.core.demo.parser import _EventReader, parse_demo_cached
@@ -97,16 +96,25 @@ def test_numpy_is_not_imported_at_startup() -> None:
     assert out.stdout.strip() == "False", out.stderr[-500:]
 
 
-@pytest.mark.parametrize("close_game", [False, True])
-def test_game_is_minimized_after_recording_unless_closed(project, tmp_path, monkeypatch, close_game: bool) -> None:  # type: ignore[no-untyped-def]  # noqa: F811
-    from tests.test_recorder import make_recorder
+def test_app_takes_focus_back_after_recording(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    """Con CS2 en primer plano y la demo en pausa, la GPU va al 100 % y exportar tarda 15 veces más.
+    Al terminar de grabar, ClutchReel vuelve al frente (CS2 sin foco se frena solo). Minimizar CS2 lo
+    congelaba (comprobado en CS2 1.41.9), así que nunca se minimiza."""
+    import os
 
-    r, _obs, cs2 = make_recorder(tmp_path, monkeypatch)
-    r.config.cs2.close_game_when_done = close_game
-    project.clips = project.clips[:1]
-    r.record_project(project, lambda m, f: None)
-    assert ("minimize" in cs2.sent) is (not close_game)
-    assert ("quit" in cs2.sent) is close_game
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    from PySide6.QtWidgets import QApplication
 
+    from clutchreel.core.recorder import win_input
+    from clutchreel.ui.main_window import MainWindow
 
-from tests.test_recorder import project  # noqa: E402, F401  (fixture)
+    QApplication.instance() or QApplication([])
+    calls: list[int] = []
+    monkeypatch.setattr(win_input, "bring_to_front", lambda hwnd: calls.append(hwnd) or True)
+    win = MainWindow.__new__(MainWindow)
+    monkeypatch.setattr(MainWindow, "show_from_tray", lambda self: None)
+    monkeypatch.setattr(MainWindow, "winId", lambda self: 1234)
+    MainWindow._take_focus_from_game(win)
+    assert calls == [1234]
+    src = (Path(__file__).resolve().parents[1] / "clutchreel" / "core" / "recorder").glob("*.py")
+    assert not any("SW_MINIMIZE" in p.read_text(encoding="utf-8") for p in src)

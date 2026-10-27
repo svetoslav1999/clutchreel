@@ -364,6 +364,7 @@ class MainWindow(QMainWindow):
             return recorder.record_project(project, lambda msg, frac: progress(frac, msg))
 
         def done(session):  # type: ignore[no-untyped-def]
+            self._take_focus_from_game()
             self.state.autosave()
             self.review.load_project()
             ok = session.done
@@ -398,6 +399,7 @@ class MainWindow(QMainWindow):
             return recorder.calibrate(project, lambda msg, frac: progress(frac, msg))
 
         def done(result):  # type: ignore[no-untyped-def]
+            self._take_focus_from_game()
             latency, path = result
             self.state.save()
             self.settings.load()
@@ -538,6 +540,21 @@ class MainWindow(QMainWindow):
             self.create_video()
 
     # ------------------------------------------------------------ close -----
+
+    def _take_focus_from_game(self) -> None:
+        """Vuelve al frente al terminar de grabar.
+
+        CS2 en primer plano con la demo en pausa dibuja sin límite de FPS (GPU al 100 %): la exportación
+        con NVENC tardaba 15 veces más (98,6 s frente a 6,5 s por clip, medido). Sin foco, CS2 se frena
+        solo. No se minimiza CS2: minimizado se queda congelado (comprobado en CS2 1.41.9).
+        """
+        self.show_from_tray()
+        try:
+            from clutchreel.core.recorder import win_input
+
+            win_input.bring_to_front(int(self.winId()))
+        except (OSError, ValueError) as exc:
+            log.debug("No se pudo traer ClutchReel al frente: %s", exc)
 
     def show_from_tray(self) -> None:
         self.showNormal()

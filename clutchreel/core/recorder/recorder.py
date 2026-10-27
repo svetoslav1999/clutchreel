@@ -319,8 +319,7 @@ class Recorder:
             log.debug("No se pudo dejar CS2 en pausa: %s", exc)
         if self.config.cs2.close_game_when_done:
             self.cs2.close_game()
-        elif self.cs2.is_running() and self.cs2.minimize_game():
-            log.info("CS2 minimizado para liberar la GPU durante la exportación")
+
 
     def _may_relaunch(self) -> bool:
         """CS2 se cerró a mitad: se pregunta antes de reabrirlo (puede haberlo cerrado el usuario).
