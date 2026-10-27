@@ -88,7 +88,7 @@ FFmpeg no hace falta instalarlo: `Iniciar.bat` lo descarga solo en `toolsfmpeg`
 2. Haz **doble clic en `Iniciar.bat`**. La primera vez crea `.venv`, instala las dependencias (versiones fijadas en `requirements.txt`) y descarga FFmpeg; tarda unos minutos.
 3. Se abre la **primera configuración**: muestra lo detectado (Steam, CS2, OBS, FFmpeg, demos) y toma tu cuenta de Steam como jugador. Tu configuración se guarda solo en ese PC, en `%APPDATA%\ClutchReel\config.json`; el repositorio no contiene contraseñas, SteamIDs ni rutas.
 4. En **Ajustes → OBS** pulsa **«Configurar OBS automáticamente»**: activa el servidor WebSocket de OBS con una contraseña nueva, la guarda en ClutchReel y reabre OBS (avisa antes de cerrarlo).
-5. Con un proyecto abierto, **Ajustes → 🎥 Probar grabación (calibrar)** para medir la latencia de ese PC.
+5. Con un proyecto abierto, **Ajustes → Probar grabación (calibrar)** para medir la latencia de ese PC.
 
 Para actualizar más adelante: `git pull` en la carpeta y vuelve a abrir `Iniciar.bat` (reinstala dependencias si `requirements.txt` cambió).
 
@@ -97,21 +97,21 @@ Para actualizar más adelante: `git pull` en la carpeta y vuelve a abrir `Inicia
 ## Uso en cinco pasos
 
 1. **Inicio**: arrastra una o varias demos a la zona grande (o elige de la lista «Demos en tu carpeta de CS2»). Se analizan con barra de progreso: mapa, fecha, marcador, jugadores y estadísticas.
-2. **Asistente** (5 pasos, botón «✨ Usar recomendado y terminar»):
+2. **Asistente** (5 pasos, botón «Usar recomendado y terminar»):
    1. jugador (se detecta tu cuenta de Steam; se recuerda para la próxima vez). Si tu cuenta no aparece en la demo no se preselecciona a nadie: elige tu jugador en la lista;
    2. qué sacar: multikills (2K/3K/4K/ACE), clutches 1vX, rachas de headshots, primeras bajas, AWP/no-scope, wallbangs, kills a través de humo, cegado, en el aire, cuchillo, rondas decisivas, mejor ronda o todas las kills;
    3. duración objetivo (1-3, 3-5, 5-10 min o sin límite): se eligen las mejores por puntuación;
    4. estilo: formato (YouTube 1080p/1440p/4K o Shorts 9:16), música, transiciones, intro/outro, marcador de kills, cámara lenta, nombre del canal;
    5. grabación: automática con OBS o vídeo ya grabado (hay que elegir el vídeo; si alguna jugada cae fuera de él, al exportar se avisa de cuáles se omitieron).
 3. **Revisión**: tarjetas de las jugadas (tipo, ronda, puntuación, duración). Arrastra para reordenar, casilla para incluir/excluir, recorta inicio/fin, cámara lenta, texto, zoom, transición y volumen por clip; música con ducking, intro/outro, logo; «Ordenar por: cronológico / mejor puntuación / crescendo»; deshacer/rehacer (Ctrl+Z / Ctrl+Y); guardar perfil. Todo se autoguarda en un proyecto `.clutchreel.json`.
-4. **🎬 Crear vídeo**: si faltan grabaciones, ClutchReel abre OBS y CS2, reproduce la demo y graba cada jugada; después monta y exporta. En «Cola y resultado» ves el progreso, la estimación de tiempo, y al terminar: abrir carpeta, previsualizar, título/descripción/etiquetas sugeridos (editables) y «Subir a YouTube (privado)».
+4. **Crear vídeo**: si faltan grabaciones, ClutchReel abre OBS y CS2, reproduce la demo y graba cada jugada; después monta y exporta. En «Cola y resultado» ves el progreso, la estimación de tiempo, y al terminar: abrir carpeta, previsualizar, título/descripción/etiquetas sugeridos (editables) y «Subir a YouTube (privado)».
 5. **Modo TODO AUTOMÁTICO** (casilla en Inicio o icono de la bandeja): vigila la carpeta de demos de CS2 y, cuando aparece una nueva, la procesa con el perfil guardado y avisa con una notificación de Windows.
 
 ---
 
 ## La primera grabación con OBS: calibración
 
-La grabación automática depende de tu PC, de OBS y de la versión de CS2, así que **la primera vez pulsa `Ajustes → 🎥 Probar grabación (calibrar)`** con un proyecto abierto. ClutchReel:
+La grabación automática depende de tu PC, de OBS y de la versión de CS2, así que **la primera vez pulsa `Ajustes → Probar grabación (calibrar)`** con un proyecto abierto. ClutchReel:
 
 1. conecta con OBS (o lo abre con el WebSocket activado), crea la escena «ClutchReel» con una fuente *Game Capture* de `cs2.exe` (si sale negra prueba *Window Capture* y luego *Display Capture*);
 2. lanza CS2 por Steam con `-insecure -novid -console -netconport 2121`;
@@ -125,6 +125,10 @@ Revisa el clip en la vista previa. Cada clip grabado lleva en su tarjeta de Revi
 1. **Puerto de consola** (`-netconport`): socket TCP local. Con CS2 1.41.9 (octubre 2026) el puerto abre en Windows sin `-tools` (y con `-tools` el juego se cerraba al saltar en la demo), así que la casilla «Añadir -tools» está desactivada. Es el único canal que permite **leer** la consola, y por tanto comprobar a quién sigue la cámara: ClutchReel compara la posición de la cámara (`getpos`) con la posición del jugador en la demo en ese tick y, además, lee el anuncio de CS2 «Added TrueView prediction for player slot N (nombre)». Un clip solo se da por bueno si ambas pruebas coinciden con tu jugador, antes y durante la grabación.
 2. **Teclado**: si el puerto no responde, ClutchReel pone CS2 en primer plano, abre la consola, teclea `exec clutchreel` (los comandos van en `cfg\clutchreel.cfg`) y la cierra.
 3. **Semiautomático**: si tampoco funciona, aparece una ventana con los comandos para que los teclees tú y pulses «Hecho».
+
+### Aspecto
+
+Tema oscuro grafito con un único acento naranja. Cada tipo de jugada tiene su color (ACE oro, clutch violeta, multikills naranjas, wallbang azul…), como las etiquetas de color de los clips en un editor de vídeo: se ve en la franja y la etiqueta de cada tarjeta de Revisión y en su miniatura (un fotograma real de la grabación, que se genera en segundo plano). Títulos y cifras usan Bahnschrift y el texto Segoe UI, ambas de serie en Windows (no se distribuye ninguna fuente). Todo el estilo está en `clutchreel/ui/theme.py`; los iconos se dibujan en `clutchreel/ui/icons.py`.
 
 ---
 

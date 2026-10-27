@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import html
 import time
 from pathlib import Path
 
@@ -19,6 +20,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from clutchreel.ui import theme
 from clutchreel.ui.state import AppState
 from clutchreel.ui.widgets.dropzone import DropZone
 from clutchreel.utils import paths
@@ -62,8 +64,12 @@ class HomePage(QWidget):
         demos_panel = QFrame()
         demos_panel.setObjectName("panel")
         dl = QVBoxLayout(demos_panel)
+        dl.setContentsMargins(16, 14, 16, 14)
+        dl.setSpacing(8)
         head = QHBoxLayout()
-        head.addWidget(QLabel("<b>Demos en tu carpeta de CS2</b>"))
+        demos_title = QLabel("Demos en tu carpeta de CS2")
+        demos_title.setObjectName("section")
+        head.addWidget(demos_title)
         head.addStretch()
         btn_refresh = QPushButton("Actualizar")
         btn_refresh.setObjectName("flat")
@@ -71,6 +77,9 @@ class HomePage(QWidget):
         head.addWidget(btn_refresh)
         dl.addLayout(head)
         self.lst_demos = QListWidget()
+        self.lst_demos.setObjectName("plainList")
+        self.lst_demos.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.lst_demos.setTextElideMode(Qt.TextElideMode.ElideMiddle)
         self.lst_demos.itemDoubleClicked.connect(self._open_demo_item)
         dl.addWidget(self.lst_demos, 1)
         self.lbl_demo_hint = QLabel("")
@@ -83,14 +92,24 @@ class HomePage(QWidget):
         right = QFrame()
         right.setObjectName("panel")
         rl = QVBoxLayout(right)
-        rl.addWidget(QLabel("<b>Proyectos recientes</b>"))
+        rl.setContentsMargins(16, 14, 16, 14)
+        rl.setSpacing(8)
+        recent_title = QLabel("Proyectos recientes")
+        recent_title.setObjectName("section")
+        rl.addWidget(recent_title)
         self.lst_recent = QListWidget()
+        self.lst_recent.setObjectName("plainList")
+        self.lst_recent.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.lst_recent.setTextElideMode(Qt.TextElideMode.ElideMiddle)
         self.lst_recent.itemDoubleClicked.connect(lambda item: self.project_chosen.emit(item.data(Qt.ItemDataRole.UserRole)))
         rl.addWidget(self.lst_recent, 1)
-        rl.addWidget(QLabel("<b>Historial de demos procesadas</b>"))
+        history_title = QLabel("Historial de demos procesadas")
+        history_title.setObjectName("section")
+        rl.addWidget(history_title)
         self.history_area = QScrollArea()
         self.history_area.setWidgetResizable(True)
         self.history_box = QWidget()
+        self.history_box.setObjectName("scrollBody")
         self.history_layout = QVBoxLayout(self.history_box)
         self.history_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
         self.history_area.setWidget(self.history_box)
@@ -153,7 +172,7 @@ class HomePage(QWidget):
                 widget.deleteLater()
         for e in self.state.history.entries[:15]:
             when = time.strftime("%d/%m/%Y %H:%M", time.localtime(e.processed_at))
-            lbl = QLabel(f"<b>{e.map_name}</b> · {e.player_name} · {e.score} · <span style='color:#8b98a9'>{when}</span>")
+            lbl = QLabel(f"<b>{html.escape(e.map_name)}</b> · {html.escape(e.player_name)} · {html.escape(e.score)} · <span style='color:{theme.current().muted}'>{when}</span>")
             lbl.setToolTip(e.demo_path + (f"\nVídeo: {e.output_video}" if e.output_video else ""))
             self.history_layout.addWidget(lbl)
         if not self.state.history.entries:

@@ -24,6 +24,7 @@ from PySide6.QtWidgets import (
 from clutchreel.core.export.builder import PRESETS
 from clutchreel.ui.dialogs import run_obs_autoconfig
 from clutchreel.ui.state import AppState
+from clutchreel.ui.widgets.iconbutton import icon_button
 from clutchreel.utils import paths
 
 
@@ -75,11 +76,11 @@ class SettingsPage(QWidget):
         title.setObjectName("title")
         head.addWidget(title)
         head.addStretch()
-        btn_diag = QPushButton("🩺 Diagnóstico")
+        btn_diag = icon_button("Diagnóstico", "health")
         btn_diag.clicked.connect(self.diagnostics_requested.emit)
-        btn_test = QPushButton("🎥 Probar grabación (calibrar)")
+        btn_test = icon_button("Probar grabación (calibrar)", "record")
         btn_test.clicked.connect(self.test_recording_requested.emit)
-        btn_logs = QPushButton("📄 Ver registro")
+        btn_logs = icon_button("Ver registro", "log")
         btn_logs.clicked.connect(self.logs_requested.emit)
         head.addWidget(btn_diag)
         head.addWidget(btn_test)

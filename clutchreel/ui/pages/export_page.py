@@ -21,13 +21,16 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from clutchreel.ui import icons
 from clutchreel.ui.jobs import STATUS_LABELS, JobQueue
 from clutchreel.ui.state import AppState
+from clutchreel.ui.theme import STATUS_STYLE
+from clutchreel.ui.widgets.iconbutton import icon_button
 from clutchreel.ui.widgets.video_preview import VideoPreview
 from clutchreel.utils.paths import open_in_explorer
 from clutchreel.utils.timeutil import format_duration
 
-STATUS_COLORS = {"hecho": "#3fb950", "parcial": "#f0883e", "error": "#f85149", "cancelado": "#8b949e"}
+STATUS_COLORS = {status: color for status, (color, _icon) in STATUS_STYLE.items()}
 
 
 class ExportPage(QWidget):
@@ -46,14 +49,19 @@ class ExportPage(QWidget):
         title = QLabel("Cola de trabajos")
         title.setObjectName("title")
         root.addWidget(title)
+        root.addSpacing(4)
 
         cur = QFrame()
         cur.setObjectName("panel")
         cl = QVBoxLayout(cur)
+        cl.setContentsMargins(16, 14, 16, 14)
+        cl.setSpacing(10)
         self.lbl_current = QLabel("Sin trabajos en curso.")
         self.lbl_current.setWordWrap(True)
+        self.lbl_current.setObjectName("section")
         self.bar = QProgressBar()
         self.bar.setRange(0, 100)
+        self.bar.setFormat("%p %")
         self.lbl_eta = QLabel("")
         self.lbl_eta.setObjectName("muted")
         row = QHBoxLayout()
@@ -73,6 +81,9 @@ class ExportPage(QWidget):
         self.tbl.setHorizontalHeaderLabels(["Trabajo", "Estado", "Progreso", "Detalle"])
         self.tbl.horizontalHeader().setStretchLastSection(True)
         self.tbl.verticalHeader().setVisible(False)
+        self.tbl.setShowGrid(False)
+        self.tbl.setAlternatingRowColors(False)
+        self.tbl.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.tbl.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.tbl.setMaximumHeight(200)
         root.addWidget(self.tbl)
@@ -94,15 +105,20 @@ class ExportPage(QWidget):
         res = QFrame()
         res.setObjectName("panel")
         rl = QGridLayout(res)
-        rl.addWidget(QLabel("<b>Último vídeo creado</b>"), 0, 0, 1, 3)
+        rl.setContentsMargins(16, 14, 16, 14)
+        rl.setHorizontalSpacing(12)
+        rl.setVerticalSpacing(8)
+        last = QLabel("Último vídeo creado")
+        last.setObjectName("section")
+        rl.addWidget(last, 0, 0, 1, 3)
         self.preview = VideoPreview()
         rl.addWidget(self.preview, 1, 0, 6, 1)
         self.lbl_result = QLabel("Todavía no hay vídeo.")
         self.lbl_result.setWordWrap(True)
         rl.addWidget(self.lbl_result, 1, 1, 1, 2)
-        self.btn_open = QPushButton("📂 Abrir carpeta")
+        self.btn_open = icon_button("Abrir carpeta", "folder")
         self.btn_open.clicked.connect(self._open_folder)
-        self.btn_play = QPushButton("▶ Previsualizar")
+        self.btn_play = icon_button("Previsualizar", "play")
         self.btn_play.clicked.connect(self._play)
         rl.addWidget(self.btn_open, 2, 1)
         rl.addWidget(self.btn_play, 2, 2)
@@ -116,7 +132,7 @@ class ExportPage(QWidget):
         self.txt_desc = QPlainTextEdit()
         self.txt_desc.setMaximumHeight(120)
         rl.addWidget(self.txt_desc, 5, 2)
-        self.btn_upload = QPushButton("⬆ Subir a YouTube (privado)")
+        self.btn_upload = icon_button("Subir a YouTube (privado)", "upload")
         self.btn_upload.clicked.connect(self._upload)
         self.btn_copy = QPushButton("Copiar título y descripción")
         self.btn_copy.clicked.connect(self._copy_meta)
@@ -146,9 +162,10 @@ class ExportPage(QWidget):
         for row, job in enumerate(reversed(jobs)):
             self.tbl.setItem(row, 0, QTableWidgetItem(job.title))
             state_item = QTableWidgetItem(STATUS_LABELS.get(job.status, job.status))
-            color = STATUS_COLORS.get(job.status)
+            color, icon_name = STATUS_STYLE.get(job.status, ("", ""))
             if color:
                 state_item.setForeground(QColor(color))
+                state_item.setIcon(icons.icon(icon_name, color, 16))
             self.tbl.setItem(row, 1, state_item)
             self.tbl.setItem(row, 2, QTableWidgetItem(f"{job.progress}%"))
             detail = QTableWidgetItem(job.error or job.message)

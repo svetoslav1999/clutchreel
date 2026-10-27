@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
     QInputDialog,
     QLabel,
     QLineEdit,
+    QListView,
     QListWidget,
     QListWidgetItem,
     QPushButton,
@@ -36,10 +37,17 @@ from clutchreel.core.export.builder import PRESETS
 from clutchreel.ui.state import AppState
 from clutchreel.ui.theme import TEXT_MUTED
 from clutchreel.ui.widgets.clip_card import ClipCard, recording_status
+from clutchreel.ui.widgets.iconbutton import icon_button
 from clutchreel.ui.widgets.video_preview import VideoPreview
 from clutchreel.utils.timeutil import format_duration
 
-CARD_HEIGHT = 100
+CARD_HEIGHT = 104
+
+
+def _section(text: str) -> QLabel:
+    lbl = QLabel(text)
+    lbl.setObjectName("section")
+    return lbl
 
 
 class ReviewPage(QWidget):
@@ -59,7 +67,7 @@ class ReviewPage(QWidget):
         self._save_timer.timeout.connect(self._do_save)
         self._pending_save: Project | None = None
         root = QVBoxLayout(self)
-        root.setContentsMargins(24, 20, 24, 20)
+        root.setContentsMargins(20, 18, 20, 18)
         root.setSpacing(12)
 
         head = QHBoxLayout()
@@ -67,11 +75,11 @@ class ReviewPage(QWidget):
         self.lbl_title.setObjectName("title")
         head.addWidget(self.lbl_title)
         head.addStretch()
-        self.btn_undo = QPushButton("↶ Deshacer")
+        self.btn_undo = icon_button("Deshacer", "undo")
         self.btn_undo.clicked.connect(self._undo)
-        self.btn_redo = QPushButton("↷ Rehacer")
+        self.btn_redo = icon_button("Rehacer", "redo")
         self.btn_redo.clicked.connect(self._redo)
-        self.btn_save_profile = QPushButton("Guardar como perfil…")
+        self.btn_save_profile = icon_button("Guardar como perfil…", "save")
         self.btn_save_profile.clicked.connect(self._save_profile)
         head.addWidget(self.btn_undo)
         head.addWidget(self.btn_redo)
@@ -104,12 +112,14 @@ class ReviewPage(QWidget):
         ll.addLayout(order_row)
         hint = QLabel("Arrastra para reordenar · casilla para incluir/excluir · clic para editar")
         hint.setObjectName("muted")
+        hint.setWordWrap(True)
         ll.addWidget(hint)
         self.lst = QListWidget()
         self.lst.setDragDropMode(QAbstractItemView.DragDropMode.InternalMove)
         self.lst.setDefaultDropAction(Qt.DropAction.MoveAction)
         self.lst.setSpacing(4)
         self.lst.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self.lst.setResizeMode(QListView.ResizeMode.Adjust)  # las tarjetas se reajustan al encoger la ventana
         self.lst.currentItemChanged.connect(self._on_select)
         self.lst.model().rowsMoved.connect(self._on_rows_moved)
         ll.addWidget(self.lst, 1)
@@ -128,7 +138,7 @@ class ReviewPage(QWidget):
         clip_box = QFrame()
         clip_box.setObjectName("panel")
         cg = QGridLayout(clip_box)
-        cg.addWidget(QLabel("<b>Clip seleccionado</b>"), 0, 0, 1, 4)
+        cg.addWidget(_section("Clip seleccionado"), 0, 0, 1, 4)
         self.lbl_clip = QLabel("—")
         self.lbl_clip.setWordWrap(True)
         cg.addWidget(self.lbl_clip, 1, 0, 1, 4)
@@ -182,7 +192,7 @@ class ReviewPage(QWidget):
         self.sld_vol.valueChanged.connect(lambda v: self._edit_clip("game_volume", v / 100.0))
         cg.addWidget(self.sld_vol, 7, 1, 1, 3)
         btn_row = QHBoxLayout()
-        self.btn_preview = QPushButton("▶ Vista previa")
+        self.btn_preview = icon_button("Vista previa", "play")
         self.btn_preview.clicked.connect(self._preview_clip)
         self.btn_dup = QPushButton("Duplicar")
         self.btn_dup.clicked.connect(self._duplicate)
@@ -198,7 +208,7 @@ class ReviewPage(QWidget):
         style_box = QFrame()
         style_box.setObjectName("panel")
         sg = QGridLayout(style_box)
-        sg.addWidget(QLabel("<b>Vídeo completo</b>"), 0, 0, 1, 4)
+        sg.addWidget(_section("Vídeo completo"), 0, 0, 1, 4)
         self.chk_music = QCheckBox("Música")
         self.chk_music.toggled.connect(lambda v: self._edit_style("music_enabled", v))
         self.cmb_music = QComboBox()
@@ -282,18 +292,23 @@ class ReviewPage(QWidget):
             edit.setMinimumWidth(60)
         right.setWidget(rbox)
         splitter.addWidget(right)
-        splitter.setStretchFactor(0, 1)
-        splitter.setStretchFactor(1, 1)
-        splitter.setSizes([480, 720])
+        splitter.setChildrenCollapsible(False)
+        # Mínimos explícitos: con la ventana al mínimo (1180 px) caben las tarjetas y el panel de edición
+        # sin cortarse; el sobrante se reparte casi a partes iguales.
+        left.setMinimumWidth(392)
+        right.setMinimumWidth(rbox.minimumSizeHint().width() + right.verticalScrollBar().sizeHint().width() + 4)
+        splitter.setStretchFactor(0, 45)
+        splitter.setStretchFactor(1, 55)
+        splitter.setSizes([520, 600])
 
         bottom = QHBoxLayout()
         self.lbl_total = QLabel("")
         self.lbl_total.setObjectName("muted")
         bottom.addWidget(self.lbl_total)
         bottom.addStretch()
-        self.btn_record = QPushButton("🎥 Grabar jugadas con OBS")
+        self.btn_record = icon_button("Grabar jugadas con OBS", "record")
         self.btn_record.clicked.connect(self._on_record_clicked)
-        self.btn_create = QPushButton("🎬 Crear vídeo")
+        self.btn_create = icon_button("Crear vídeo", "film", primary=True)
         self.btn_create.setObjectName("primary")
         self.btn_create.clicked.connect(self._on_create_clicked)
         bottom.addWidget(self.btn_record)

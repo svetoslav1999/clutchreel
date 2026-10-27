@@ -184,3 +184,25 @@ def test_wait_all_waits_for_slow_cleanup(qapp):  # type: ignore[no-untyped-def]
     pool.start(Worker(job))
     assert pool.wait_all(10000, keep_alive=QApplication.processEvents)
     assert finished.is_set()
+
+
+def test_cards_shrink_with_the_window(state, match, tmp_path):  # type: ignore[no-untyped-def]
+    """Al encoger la ventana las tarjetas conservaban el ancho anterior y se cortaba su columna derecha."""
+    from clutchreel.ui.pages.review_page import ReviewPage
+    from clutchreel.ui.widgets.clip_card import ClipCard
+
+    page = ReviewPage(state)
+    state.project = _project(match, tmp_path)
+    page.load_project()
+    page.resize(1400, 800)
+    page.show()
+    QApplication.processEvents()
+    page.resize(900, 700)
+    for _ in range(10):
+        QApplication.processEvents()
+        time.sleep(0.02)
+    card = page.lst.itemWidget(page.lst.item(0))
+    assert isinstance(card, ClipCard)
+    assert card.width() <= page.lst.viewport().width()
+    assert card.lbl_score.geometry().right() <= card.width()
+    page.hide()

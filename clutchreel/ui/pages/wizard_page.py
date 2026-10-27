@@ -6,7 +6,8 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import QRectF, Qt, Signal
+from PySide6.QtGui import QColor, QPainter
 from PySide6.QtWidgets import (
     QCheckBox,
     QComboBox,
@@ -33,7 +34,9 @@ from clutchreel.core.demo.stats import compute_stats
 from clutchreel.core.editor.music import list_tracks
 from clutchreel.core.export.builder import PRESETS
 from clutchreel.core.export.metadata import pretty_map
+from clutchreel.ui import theme
 from clutchreel.ui.state import AppState
+from clutchreel.ui.widgets.iconbutton import icon_button
 from clutchreel.utils import paths
 
 KIND_ORDER = ["ace", "4k", "3k", "2k", "clutch", "headshot_streak", "entry", "awp", "noscope", "wallbang", "smoke", "blind", "air", "knife", "decisive", "best_round", "all_kills"]
@@ -53,6 +56,43 @@ class WizardResult:
     existing_offset: float = 0.0
     remember_player: bool = True
     extra: dict[str, Any] = field(default_factory=dict)
+
+
+def _section(text: str) -> QLabel:
+    lbl = QLabel(text)
+    lbl.setObjectName("section")
+    return lbl
+
+
+class StepBar(QWidget):
+    """Avance del asistente: un tramo por paso (hechos y actual en el acento)."""
+
+    def __init__(self, steps: int) -> None:
+        super().__init__()
+        self.steps = steps
+        self.current = 0
+        self.setFixedHeight(6)
+        self.setMinimumWidth(120)
+
+    def set_current(self, index: int) -> None:
+        self.current = index
+        self.update()
+
+    def paintEvent(self, _event) -> None:  # type: ignore[no-untyped-def]
+        p = QPainter(self)
+        p.setRenderHint(QPainter.RenderHint.Antialiasing)
+        p.setPen(Qt.PenStyle.NoPen)
+        pal = theme.current()
+        gap = 6.0
+        w = (self.width() - gap * (self.steps - 1)) / self.steps
+        for i in range(self.steps):
+            color = QColor(pal.accent)
+            if i > self.current:
+                color = QColor(pal.line)
+            elif i < self.current:
+                color.setAlpha(150)
+            p.setBrush(color)
+            p.drawRoundedRect(QRectF(i * (w + gap), 0, w, self.height()), 3, 3)
 
 
 class WizardPage(QWidget):
@@ -75,7 +115,12 @@ class WizardPage(QWidget):
         root.addWidget(self.lbl_match)
         self.lbl_step = QLabel("")
         self.lbl_step.setObjectName("muted")
-        root.addWidget(self.lbl_step)
+        step_row = QHBoxLayout()
+        step_row.setSpacing(12)
+        self.step_bar = StepBar(5)
+        step_row.addWidget(self.lbl_step)
+        step_row.addWidget(self.step_bar, 1)
+        root.addLayout(step_row)
         self.stack = QStackedWidget()
         root.addWidget(self.stack, 1)
         self.stack.addWidget(self._build_player_step())
@@ -87,7 +132,7 @@ class WizardPage(QWidget):
         nav = QHBoxLayout()
         self.btn_cancel = QPushButton("Cancelar")
         self.btn_cancel.clicked.connect(self.cancelled.emit)
-        self.btn_recommended = QPushButton("✨ Usar recomendado y terminar")
+        self.btn_recommended = icon_button("Usar recomendado y terminar", "check")
         self.btn_recommended.setToolTip("Aplica los valores recomendados en todos los pasos y pasa a la revisión")
         self.btn_recommended.clicked.connect(self._use_recommended)
         self.btn_back = QPushButton("← Atrás")
@@ -108,7 +153,7 @@ class WizardPage(QWidget):
     def _build_player_step(self) -> QWidget:
         w = QWidget()
         layout = QVBoxLayout(w)
-        layout.addWidget(QLabel("<b>1. ¿De qué jugador quieres las jugadas?</b>"))
+        layout.addWidget(_section("1. ¿De qué jugador quieres las jugadas?"))
         hint = QLabel("Se detecta automáticamente con tu cuenta de Steam. Doble clic para elegir otro.")
         hint.setObjectName("muted")
         layout.addWidget(hint)
@@ -134,7 +179,7 @@ class WizardPage(QWidget):
     def _build_kinds_step(self) -> QWidget:
         w = QWidget()
         layout = QVBoxLayout(w)
-        layout.addWidget(QLabel("<b>2. ¿Qué quieres sacar?</b>"))
+        layout.addWidget(_section("2. ¿Qué quieres sacar?"))
         grid = QGridLayout()
         grid.setHorizontalSpacing(24)
         self.kind_checks: dict[str, QCheckBox] = {}
@@ -166,7 +211,7 @@ class WizardPage(QWidget):
     def _build_duration_step(self) -> QWidget:
         w = QWidget()
         layout = QVBoxLayout(w)
-        layout.addWidget(QLabel("<b>3. ¿Cuánto debe durar el vídeo?</b>"))
+        layout.addWidget(_section("3. ¿Cuánto debe durar el vídeo?"))
         hint = QLabel("ClutchReel elegirá las mejores jugadas por puntuación hasta llenar esa duración.")
         hint.setObjectName("muted")
         layout.addWidget(hint)
@@ -182,7 +227,7 @@ class WizardPage(QWidget):
     def _build_style_step(self) -> QWidget:
         w = QWidget()
         outer = QVBoxLayout(w)
-        outer.addWidget(QLabel("<b>4. Estilo del vídeo</b>"))
+        outer.addWidget(_section("4. Estilo del vídeo"))
         area = QScrollArea()
         area.setWidgetResizable(True)
         inner = QWidget()
@@ -243,7 +288,7 @@ class WizardPage(QWidget):
     def _build_recording_step(self) -> QWidget:
         w = QWidget()
         layout = QVBoxLayout(w)
-        layout.addWidget(QLabel("<b>5. ¿Cómo se graban las jugadas?</b>"))
+        layout.addWidget(_section("5. ¿Cómo se graban las jugadas?"))
         self.rb_obs = QRadioButton("Automático con OBS (recomendado): ClutchReel abre CS2, reproduce la demo y graba cada jugada")
         self.rb_obs.setChecked(True)
         self.rb_existing = QRadioButton("Ya tengo la grabación de la partida completa (selecciona el vídeo y sincroniza)")
@@ -392,6 +437,8 @@ class WizardPage(QWidget):
         i = self.stack.currentIndex()
         n = self.stack.count()
         self.lbl_step.setText(f"Paso {i + 1} de {n}")
+        self.step_bar.steps = n
+        self.step_bar.set_current(i)
         self.btn_back.setEnabled(i > 0)
         self.btn_next.setText("Terminar y revisar jugadas" if i == n - 1 else "Siguiente →")
 

@@ -8,7 +8,7 @@ import traceback
 from pathlib import Path
 
 from PySide6.QtCore import QByteArray, Qt
-from PySide6.QtGui import QColor, QFont, QIcon, QPainter, QPixmap
+from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication, QMessageBox
 
 from clutchreel import APP_NAME
@@ -22,19 +22,12 @@ def make_icon() -> QIcon:
     ico = assets_dir() / "icon.ico"
     if ico.exists():
         return QIcon(str(ico))
-    pix = QPixmap(128, 128)
-    pix.fill(Qt.GlobalColor.transparent)
-    painter = QPainter(pix)
-    painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-    painter.setBrush(QColor("#f5a524"))
-    painter.setPen(Qt.PenStyle.NoPen)
-    painter.drawRoundedRect(4, 4, 120, 120, 28, 28)
-    painter.setPen(QColor("#171717"))
-    font = QFont("Segoe UI", 54, QFont.Weight.Black)
-    painter.setFont(font)
-    painter.drawText(pix.rect(), Qt.AlignmentFlag.AlignCenter, "CR")
-    painter.end()
-    return QIcon(pix)
+    from clutchreel.ui.icons import app_icon_pixmap
+
+    icon = QIcon()
+    for size in (16, 24, 32, 48, 64, 128, 256):
+        icon.addPixmap(app_icon_pixmap(size))
+    return icon
 
 
 def _install_excepthook(app: QApplication) -> None:

@@ -25,7 +25,7 @@ Iniciar.bat ──► scripts/obtener_ffmpeg.py ──► python -m clutchreel
 
 ## Flujo de datos
 
-1. **Análisis** (`core/demo/parser.py`): `parse_demo()` → `MatchData` (mapa, tickrate real medido con `game_time`, rondas con alineaciones por ronda, kills con todos los flags, jugadores con `user_id`).
+1. **Análisis** (`core/demo/parser.py`): `parse_demo_cached()` (caché por huella de la demo) → `parse_demo()` lee todos los eventos en una pasada → `MatchData` (mapa, tickrate real medido con `game_time`, rondas con alineaciones por ronda, kills con todos los flags, jugadores con `user_id`).
 2. **Detección** (`detectors.py`): cada detector produce `Highlight`s (ticks, puntuación, descripción). `merge_highlights()` fusiona solapes de la misma ronda. `selector.py` elige por duración objetivo y ordena.
 3. **Proyecto** (`core/editor/project.py`): `Project` = `MatchData` + lista de `Clip` (jugada + recorte + estilo + grabación asociada) + `StyleSettings`. Se serializa a JSON; `UndoStack` guarda instantáneas.
 4. **Grabación** (`core/recorder/recorder.py`): por clip → `demo_pause` + `demo_gototick(inicio − 1 s)` → `spec_player` + verificación de cámara → OBS `StartRecord` → 0,6 s → `demo_step_tick N` (t_resume; N = ticks del clip + 0,8 s) → CS2 reproduce exactamente N ticks y pausa solo («Demo paused at engine time X, demo tick Y») → `StopRecord` (ruta). CS2 reproduce las demos a ~57 ticks/s (no 64; medido en 1.41.9), así que la velocidad real se mide por clip (`Clip.recording_tickrate`) y el exportador convierte ticks→segundos con ella. Desfase del clip en el fichero = `(t_resume − t_rec) + latencia_calibrada + margen_previo/velocidad + ajuste_manual`. `video_check.check_clip()` descarta clips vacíos/negros/estáticos; reintento por clip; autoguardado tras cada clip (reanudable).
@@ -40,3 +40,7 @@ Iniciar.bat ──► scripts/obtener_ffmpeg.py ──► python -m clutchreel
 - **Sincronización**: en vez de confiar en el tiempo exacto de cada comando, se graba con margen y se recorta en la exportación con el desfase calibrado (medido con la detección de movimiento del clip de prueba).
 - **Configuración**: dataclasses anidadas → JSON tolerante (claves desconocidas ignoradas, tipos inválidos → valor por defecto). Perfiles = instantáneas de estilo/exportación/detección.
 - **Sin tocar el juego**: no hay inyección, ni lectura de memoria, ni plugins; solo el visor oficial y comandos de consola.
+
+## Interfaz y tema
+
+Todo el estilo está en `ui/theme.py` (paletas oscura y clara como tokens, escala tipográfica, colores por tipo de jugada y la hoja QSS generada a partir de ellos). Los iconos son trazos dibujados con QPainter en `ui/icons.py` (sin ficheros ni emojis). Las tarjetas de Revisión (`ui/widgets/clip_card.py`) cargan su miniatura (un fotograma de la grabación) en segundo plano con un `QThreadPool` de un hilo y la guardan en `%APPDATA%\ClutchReel\cache\miniaturas`.

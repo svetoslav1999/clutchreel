@@ -8,6 +8,7 @@ from pathlib import Path
 from PySide6.QtCore import Qt, QUrl
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QPushButton, QSlider, QVBoxLayout, QWidget
 
+from clutchreel.ui import icons, theme
 from clutchreel.utils.timeutil import format_duration
 
 log = logging.getLogger(__name__)
@@ -46,7 +47,9 @@ class VideoPreview(QWidget):
         except Exception as exc:  # noqa: BLE001
             log.warning("QtMultimedia no disponible: %s", exc)
         controls = QHBoxLayout()
-        self.btn_play = QPushButton("▶")
+        self.btn_play = QPushButton("")
+        self.btn_play.setIcon(icons.icon("play", theme.current().text, 16))
+        self.btn_play.setToolTip("Reproducir / pausar")
         self.btn_play.setFixedWidth(44)
         self.btn_play.clicked.connect(self.toggle)
         self.slider = QSlider(Qt.Orientation.Horizontal)
@@ -80,17 +83,17 @@ class VideoPreview(QWidget):
             self._player.setPosition(int(start * 1000))
         if autoplay:
             self._player.play()
-            self.btn_play.setText("⏸")
+            self.btn_play.setIcon(icons.icon("pause", theme.current().text, 16))
         else:
             # Reproduce y pausa para que se vea el primer fotograma.
             self._player.play()
             self._player.pause()
-            self.btn_play.setText("▶")
+            self.btn_play.setIcon(icons.icon("play", theme.current().text, 16))
 
     def stop(self) -> None:
         if self._player:
             self._player.stop()
-            self.btn_play.setText("▶")
+            self.btn_play.setIcon(icons.icon("play", theme.current().text, 16))
 
     def toggle(self) -> None:
         if not self._player:
@@ -99,12 +102,12 @@ class VideoPreview(QWidget):
 
         if self._player.playbackState() == QMediaPlayer.PlaybackState.PlayingState:
             self._player.pause()
-            self.btn_play.setText("▶")
+            self.btn_play.setIcon(icons.icon("play", theme.current().text, 16))
         else:
             if self._range and self._player.position() >= int(self._range[1] * 1000) - 50:
                 self._player.setPosition(int(self._range[0] * 1000))
             self._player.play()
-            self.btn_play.setText("⏸")
+            self.btn_play.setIcon(icons.icon("pause", theme.current().text, 16))
 
     def _on_duration(self, ms: int) -> None:
         self._duration_ms = ms
@@ -117,7 +120,7 @@ class VideoPreview(QWidget):
         self.lbl_time.setText(f"{format_duration(ms / 1000)} / {format_duration(self._duration_ms / 1000)}")
         if self._range and ms >= int(self._range[1] * 1000) and self._player:
             self._player.pause()
-            self.btn_play.setText("▶")
+            self.btn_play.setIcon(icons.icon("play", theme.current().text, 16))
 
     def _seek_slider(self, value: int) -> None:
         if self._player and self._duration_ms:

@@ -7,7 +7,7 @@ import threading
 from pathlib import Path
 from typing import Any
 
-from PySide6.QtCore import QObject, Qt, QTimer, Signal
+from PySide6.QtCore import QObject, QSize, Qt, QTimer, Signal
 from PySide6.QtGui import QAction, QCloseEvent, QIcon, QKeySequence
 from PySide6.QtWidgets import (
     QApplication,
@@ -34,7 +34,7 @@ from clutchreel.services.config import DetectionSettings, StyleSettings, from_di
 from clutchreel.services.history import HistoryEntry, demo_fingerprint
 from clutchreel.services.watcher import DemoWatcher
 from clutchreel.services.youtube import upload_video
-from clutchreel.ui import dialogs
+from clutchreel.ui import dialogs, icons, theme
 from clutchreel.ui.jobs import Job, JobQueue
 from clutchreel.ui.pages.export_page import ExportPage
 from clutchreel.ui.pages.home_page import HomePage
@@ -89,13 +89,21 @@ class MainWindow(QMainWindow):
 
         sidebar = QWidget()
         sidebar.setObjectName("sidebar")
-        sidebar.setFixedWidth(220)
+        sidebar.setFixedWidth(208)
         sl = QVBoxLayout(sidebar)
-        sl.setContentsMargins(14, 22, 14, 18)
-        sl.setSpacing(6)
-        brand = QLabel("🎯 ClutchReel")
-        brand.setStyleSheet("font-size: 20px; font-weight: 800; padding: 6px 8px 18px 8px;")
-        sl.addWidget(brand)
+        sl.setContentsMargins(0, 22, 0, 18)
+        sl.setSpacing(2)
+        brand_row = QHBoxLayout()
+        brand_row.setContentsMargins(10, 0, 8, 22)
+        brand_row.setSpacing(10)
+        mark = QLabel()
+        mark.setPixmap(icons.brand_mark(34))
+        brand = QLabel("ClutchReel")
+        brand.setObjectName("brand")
+        brand_row.addWidget(mark)
+        brand_row.addWidget(brand)
+        brand_row.addStretch()
+        sl.addLayout(brand_row)
         self.nav_buttons: list[QPushButton] = []
         self.stack = QStackedWidget()
         self.home = HomePage(state)
@@ -103,10 +111,19 @@ class MainWindow(QMainWindow):
         self.review = ReviewPage(state)
         self.export_page = ExportPage(state, self.queue)
         self.settings = SettingsPage(state)
-        for name, page in (("🏠  Inicio", self.home), ("🧭  Asistente", self.wizard), ("✂️  Revisión", self.review), ("📦  Cola y resultado", self.export_page), ("⚙️  Ajustes", self.settings)):
+        pal = theme.current()
+        for name, icon_name, page in (
+            ("Inicio", "home", self.home),
+            ("Asistente", "wizard", self.wizard),
+            ("Revisión", "review", self.review),
+            ("Cola y resultado", "queue", self.export_page),
+            ("Ajustes", "settings", self.settings),
+        ):
             idx = self.stack.addWidget(page)
             btn = QPushButton(name)
             btn.setObjectName("nav")
+            btn.setIcon(icons.icon(icon_name, pal.muted, 20, active_color=pal.accent))
+            btn.setIconSize(QSize(20, 20))
             btn.setCheckable(True)
             btn.setCursor(Qt.CursorShape.PointingHandCursor)
             btn.clicked.connect(lambda _c=False, i=idx: self.go(i))
@@ -115,6 +132,7 @@ class MainWindow(QMainWindow):
         sl.addStretch()
         self.lbl_version = QLabel(f"v{__version__}")
         self.lbl_version.setObjectName("muted")
+        self.lbl_version.setContentsMargins(16, 0, 0, 0)
         sl.addWidget(self.lbl_version)
         layout.addWidget(sidebar)
         layout.addWidget(self.stack, 1)
