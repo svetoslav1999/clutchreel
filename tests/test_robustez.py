@@ -276,3 +276,34 @@ def test_capture_cvar_is_applied_even_if_fresh_cs2_does_not_answer_in_time(tmp_p
     assert "demo_ui_mode 0" in cs2.sent
     assert not any(c.startswith("engine_no_focus_sleep") for c in cs2.sent)
     assert "demo_ui_modex3" in cs2.reads  # se reintenta antes de rendirse
+
+
+@pytest.mark.skipif(not FFmpeg().available, reason="FFmpeg no instalado")
+def test_existing_recording_reports_plays_outside_the_video(match, tmp_path: Path) -> None:  # type: ignore[no-untyped-def]
+    """«Ya tengo la grabación»: las jugadas que caen fuera del vídeo se omitían sin avisar."""
+    from clutchreel.core.demo.models import Highlight
+    from clutchreel.core.editor.project import new_project
+    from clutchreel.core.export.exporter import Exporter, ExportError
+    from clutchreel.services.config import AppConfig, StyleSettings
+    from tests.conftest import ME
+
+    ff = FFmpeg()
+    video = tmp_path / "partida ñ.mp4"
+    ff.run(["-f", "lavfi", "-i", "testsrc=size=320x180:rate=30:duration=6", "-f", "lavfi", "-i", "sine=duration=6", "-c:v", "libx264", "-preset", "ultrafast", "-c:a", "aac", "-shortest", str(video)])
+    style = StyleSettings(music_enabled=False, intro_enabled=False, outro_enabled=False, transitions=False, slow_motion=False)
+    inside = Highlight("2k", 1, 64, 64 * 4, 30.0, "dentro", key_tick=128)
+    outside = Highlight("3k", 2, 64 * 100, 64 * 104, 50.0, "fuera", key_tick=64 * 101)
+    p = new_project(match, ME, "yo", [inside, outside], style)
+    p.recording_mode = "existing"
+    p.existing_recording = str(video)
+    p.export_preset = "youtube_1080p60"
+    cfg = AppConfig()
+    cfg.paths.output_folder = str(tmp_path / "salida")
+    cfg.export.hw_accel = "cpu"
+    cfg.export.thumbnail = False
+    cfg.export.loudnorm = False
+    res = Exporter(cfg, ff).export(p)
+    assert res.video.exists() and res.skipped == ["Ronda 2 (3K)"]
+    p.clips = p.clips[1:]
+    with pytest.raises(ExportError, match="desfase"):
+        Exporter(cfg, ff).export(p)

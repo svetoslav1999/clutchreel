@@ -442,6 +442,13 @@ class MainWindow(QMainWindow):
         self.export_page.show_result(result.video, result.thumbnail, result.duration, meta.title, meta.description, meta.tags)
         self.state.history.update_output(project.match.demo_path, str(result.video))
         self.go(3)
+        if result.skipped:
+            where = "no están dentro del vídeo de la partida (revisa el desfase)" if project.recording_mode == "existing" else "quedaban demasiado cortas tras recortar"
+            dialogs.show_info(
+                self,
+                "Jugadas omitidas",
+                f"El vídeo se creó, pero {len(result.skipped)} jugada(s) {where}:" + "".join(f"\n• {s}" for s in result.skipped),
+            )
         if cfg.export.notify_when_done:
             notify("ClutchReel", f"Vídeo listo: {result.video.name}")
         if cfg.export.open_folder_when_done:

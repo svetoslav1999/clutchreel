@@ -8,7 +8,7 @@ import tempfile
 import threading
 import time
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 
 from clutchreel.core.demo.models import KIND_LABELS, Highlight
@@ -37,6 +37,7 @@ class ExportResult:
     thumbnail: Path | None
     duration: float
     elapsed: float
+    skipped: list[str] = field(default_factory=list)  # jugadas omitidas (fuera del vídeo o demasiado cortas)
 
 
 def _remove_stale_exports(cache: Path, older_than: float = 6 * 3600) -> None:
@@ -121,6 +122,7 @@ class Exporter:
         intermediates: list[Path] = []
         durations: list[float] = []
         rendered: list[Clip] = []
+        skipped: list[str] = []
         beats: list[float] = []
         music = pick_track(cfg.paths.music_folder, style.music_track) if style.music_enabled else None
         if style.beat_sync and music:
@@ -143,6 +145,7 @@ class Exporter:
                 trim_end = min(trim_end, info.duration)
             if trim_end - trim_start < 0.5:
                 log.warning("Clip %s demasiado corto tras recortar; se omite", clip.id)
+                skipped.append(f"Ronda {hl.round} ({hl.label})")
                 continue
             key_rel = ticks_to_seconds(hl.key_tick - hl.start_tick, rate) - clip.trim_start
             slow_at = key_rel if (style.slow_motion and clip.slow_motion and 0 < key_rel < trim_end - trim_start) else None
@@ -182,6 +185,8 @@ class Exporter:
             rendered.append(clip)
             durations.append(self.ffmpeg.probe(spec.output).duration or spec.output_duration())
         if not intermediates:
+            if project.recording_mode == "existing":
+                raise ExportError("Ninguna jugada cae dentro del vídeo de la partida. Revisa el desfase en Revisión (vídeo existente).")
             raise ExportError("Ningún clip pudo renderizarse.")
 
         # 2) Intro / outro ----------------------------------------------------
@@ -265,7 +270,7 @@ class Exporter:
         project.output_video = str(final)
         project.thumbnail = str(thumb) if thumb else ""
         report(1.0, "Exportación terminada")
-        return ExportResult(video=final, thumbnail=thumb, duration=total, elapsed=time.time() - t0)
+        return ExportResult(video=final, thumbnail=thumb, duration=total, elapsed=time.time() - t0, skipped=skipped)
 
     @staticmethod
     def _snap_to_beats(desired: float, beats: list[float], elapsed: float) -> float:
