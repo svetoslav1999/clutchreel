@@ -1,6 +1,6 @@
 [project]
 name = "clutchreel"
-version = "1.0.0"
+version = "1.1.0"
 description = "Convierte demos de Counter-Strike 2 en vídeos de mejores jugadas listos para YouTube."
 requires-python = ">=3.11"
 
