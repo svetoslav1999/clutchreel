@@ -51,22 +51,15 @@ if not exist ".venv\Scripts\python.exe" (
     )
 )
 set "VPY=.venv\Scripts\python.exe"
-set "NEED_INSTALL=0"
-if not exist ".venv\.instalado" set "NEED_INSTALL=1"
-if exist ".venv\.instalado" (
-    for /f %%A in ('%VPY% -c "import pathlib,sys;a=pathlib.Path('requirements.txt').stat().st_mtime;b=pathlib.Path('.venv/.instalado').stat().st_mtime;print(1 if a>b else 0)"') do set "NEED_INSTALL=%%A"
+rem Reinstala solo si cambia el contenido de requirements.txt (huella en .venv\.instalado) y quita
+rem los paquetes que la version nueva ya no usa (p. ej. obsws-python en la 1.1.0).
+"%VPY%" -I scripts\dependencias.py
+if errorlevel 1 goto :fin_error
+rem «Iniciar.bat --solo-instalar»: prepara el entorno sin abrir la app (lo usan las pruebas).
+if /I "%~1"=="--solo-instalar" (
+    echo [OK] Entorno listo
+    exit /b 0
 )
-if "%NEED_INSTALL%"=="1" (
-    echo [..] Instalando dependencias ^(puede tardar unos minutos^)...
-    "%VPY%" -m pip install --upgrade pip --quiet --disable-pip-version-check
-    "%VPY%" -m pip install -r requirements.txt --quiet --disable-pip-version-check
-    if errorlevel 1 (
-        echo [X] Fallo la instalacion de dependencias. Comprueba la conexion a Internet y vuelve a intentarlo.
-        goto :fin_error
-    )
-    echo instalado> ".venv\.instalado"
-)
-echo [OK] Dependencias listas
 
 rem ---------- 3) FFmpeg ----------
 "%VPY%" -I scripts\obtener_ffmpeg.py

@@ -76,7 +76,7 @@ ClutchReel se instala clonando el repositorio privado; no hace falta copiar nada
 | OBS Studio 28 o superior | incluye obs-websocket |
 | Steam + Counter-Strike 2 | con sesión iniciada |
 
-FFmpeg no hace falta instalarlo: `Iniciar.bat` lo descarga solo en `toolsfmpeg`.
+FFmpeg no hace falta instalarlo: `Iniciar.bat` lo descarga solo en `tools\ffmpeg`.
 
 **Pasos**
 
@@ -90,7 +90,19 @@ FFmpeg no hace falta instalarlo: `Iniciar.bat` lo descarga solo en `toolsfmpeg`
 4. En **Ajustes → OBS** pulsa **«Configurar OBS automáticamente»**: activa el servidor WebSocket de OBS con una contraseña nueva, la guarda en ClutchReel y reabre OBS (avisa antes de cerrarlo).
 5. Con un proyecto abierto, **Ajustes → Probar grabación (calibrar)** para medir la latencia de ese PC.
 
-Para actualizar más adelante: `git pull` en la carpeta y vuelve a abrir `Iniciar.bat` (reinstala dependencias si `requirements.txt` cambió).
+Para actualizar más adelante, ver «Actualizar».
+
+## Actualizar
+
+Las novedades de cada versión están en [`CHANGELOG.md`](CHANGELOG.md).
+
+1. Cierra ClutchReel.
+2. Haz **doble clic en `Actualizar.bat`**. Descarga la última versión (`git fetch` + `git pull --ff-only`), instala o quita las dependencias que hayan cambiado y muestra la versión instalada.
+3. Abre ClutchReel con `Iniciar.bat`.
+
+`Actualizar.bat` nunca descarta cambios locales: si has modificado algún archivo de ClutchReel, se detiene y te indica cómo guardarlo (`git stash`). Si tu copia y la de GitHub tienen historiales distintos, muestra el comando para dejarla igual que la de GitHub. Tu configuración (`%APPDATA%\ClutchReel`) no está en el repositorio y no se toca al actualizar.
+
+`Iniciar.bat` también comprueba las dependencias en cada arranque: si el contenido de `requirements.txt` cambió, las reinstala y desinstala las que ya no se usan.
 
 ---
 
