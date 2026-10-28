@@ -1,4 +1,4 @@
-# Versiones probadas (Windows 11, Python 3.11-3.12). Iniciar.bat las instala en .venv.
+# Versiones probadas (Windows 11, Python 3.12; numpy 2.5 exige Python 3.12 o superior). Iniciar.bat las instala en .venv.
 PySide6==6.12.0
 demoparser2==0.42.1
 websocket-client==1.9.2

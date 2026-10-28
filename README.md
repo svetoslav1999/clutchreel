@@ -34,25 +34,48 @@ Convierte demos de **Counter-Strike 2** (partidas Premier/Competitivo) en vídeo
 | Qué | Para qué | Dónde |
 |---|---|---|
 | Windows 10/11 64 bits | — | — |
-| Python 3.11 o superior | ejecutar la app | `Iniciar.bat` lo comprueba y te explica cómo instalarlo (`winget install Python.Python.3.12`) |
-| FFmpeg | cortar, unir y exportar | `Iniciar.bat` lo descarga solo en `tools\ffmpeg` si no está instalado |
+| Python 3.12 o superior (probado con 3.12) | ejecutar la app | `Iniciar.bat` lo comprueba y te explica cómo instalarlo (`winget install Python.Python.3.12`) |
+| FFmpeg | cortar, unir y exportar | `Iniciar.bat` lo descarga solo en `tools\ffmpeg` si no está instalado (ver nota abajo) |
 | Steam + Counter-Strike 2 | reproducir las demos para grabarlas | se detectan por el registro de Windows y `libraryfolders.vdf` |
 | OBS Studio 28 o superior | grabar la pantalla del juego (incluye obs-websocket) | https://obsproject.com |
 | GPU NVIDIA / AMD / Intel | codificación por hardware (opcional, si no, CPU) | se detecta automáticamente |
 
 Sin OBS ni CS2 puedes usar igualmente el modo **«Ya tengo la grabación»**: le das el vídeo de la partida completa y ClutchReel corta las jugadas de ahí.
 
+**Sobre FFmpeg.** FFmpeg es un programa aparte, no forma parte de ClutchReel. Si no lo tienes, `Iniciar.bat` descarga la compilación «essentials» de [gyan.dev](https://www.gyan.dev/ffmpeg/builds/) (licencia GPL-3.0) en la carpeta `tools\ffmpeg` de tu copia. Si prefieres instalarlo tú, usa `winget install Gyan.FFmpeg` o indica la ruta de tu `ffmpeg.exe` en Ajustes → Rutas.
+
 ---
 
-## Instalación y arranque
+## Instalación
 
-1. Copia la carpeta `ClutchReel` donde quieras (vale una ruta con espacios o tildes, y OneDrive).
-2. Haz **doble clic en `Iniciar.bat`**. La primera vez:
-   - comprueba Python 3.11+ (si falta, te ofrece instalarlo con winget);
-   - crea el entorno virtual `.venv` e instala las dependencias;
-   - comprueba FFmpeg y, si falta, lo descarga (build oficial de gyan.dev, ~90 MB);
-   - abre ClutchReel.
-3. Las siguientes veces arranca directamente.
+Hay dos formas. La primera es la recomendada porque permite actualizar con un doble clic.
+
+**A. Con Git (recomendada)**
+
+1. Instala [Git](https://git-scm.com/download/win) si no lo tienes (`winget install Git.Git`).
+2. Abre una terminal en la carpeta donde quieras ClutchReel y ejecuta:
+   ```
+   git clone https://github.com/svetoslav1999/clutchreel.git
+   ```
+   Vale cualquier carpeta, también con espacios, tildes u OneDrive.
+
+**B. Sin Git**
+
+1. En la página del repositorio pulsa **Code → Download ZIP**.
+2. Descomprime el ZIP donde quieras.
+
+Con esta forma `Actualizar.bat` no funciona: para actualizar, descarga el ZIP nuevo y sustituye la carpeta (tu configuración está en `%APPDATA%\ClutchReel` y no se pierde).
+
+**Primer arranque (en los dos casos)**
+
+1. Haz **doble clic en `Iniciar.bat`**. La primera vez:
+   - comprueba que tienes Python 3.12 o superior (si falta, te ofrece instalarlo con winget);
+   - crea el entorno virtual `.venv` e instala las dependencias (versiones fijadas en `requirements.txt`);
+   - comprueba FFmpeg y, si falta, lo descarga (ver «Sobre FFmpeg», ~90 MB);
+   - abre ClutchReel. Tarda unos minutos solo la primera vez; las siguientes arranca directamente.
+2. Se abre la **primera configuración**: muestra lo detectado (Steam, CS2, OBS, FFmpeg, demos) y toma tu cuenta de Steam como jugador. Tu configuración se guarda solo en tu PC, en `%APPDATA%\ClutchReel\config.json`; el repositorio no contiene contraseñas, SteamIDs ni rutas.
+3. En **Ajustes → OBS** pulsa **«Configurar OBS automáticamente»**: activa el servidor WebSocket de OBS con una contraseña nueva, la guarda en ClutchReel y reabre OBS (avisa antes de cerrarlo).
+4. Con un proyecto abierto, **Ajustes → Probar grabación (calibrar)** para medir la latencia de tu PC.
 
 También puedes abrir una demo directamente: `Iniciar.bat "C:\ruta\partida.dem"`.
 
@@ -60,41 +83,11 @@ También puedes abrir una demo directamente: `Iniciar.bat "C:\ruta\partida.dem"`
 
 `scripts\construir_exe.bat` genera `dist\ClutchReel\ClutchReel.exe` con PyInstaller (necesita haber ejecutado antes `Iniciar.bat`).
 
----
-
-## Instalar en otro PC
-
-ClutchReel se instala clonando el repositorio privado; no hace falta copiar nada más de este PC.
-
-**Requisitos**
-
-| Qué | Notas |
-|---|---|
-| Windows 10/11 64 bits | — |
-| [Git](https://git-scm.com/download/win) | para clonar (`winget install Git.Git`) |
-| Python 3.11 o 3.12 | `winget install Python.Python.3.12` (Iniciar.bat avisa si falta) |
-| OBS Studio 28 o superior | incluye obs-websocket |
-| Steam + Counter-Strike 2 | con sesión iniciada |
-
-FFmpeg no hace falta instalarlo: `Iniciar.bat` lo descarga solo en `tools\ffmpeg`.
-
-**Pasos**
-
-1. Clona el repositorio (pedirá iniciar sesión en GitHub la primera vez, porque es privado):
-   ```
-   git clone https://github.com/svetoslav1999/clutchreel.git
-   ```
-   Vale cualquier carpeta, también con espacios, tildes u OneDrive.
-2. Haz **doble clic en `Iniciar.bat`**. La primera vez crea `.venv`, instala las dependencias (versiones fijadas en `requirements.txt`) y descarga FFmpeg; tarda unos minutos.
-3. Se abre la **primera configuración**: muestra lo detectado (Steam, CS2, OBS, FFmpeg, demos) y toma tu cuenta de Steam como jugador. Tu configuración se guarda solo en ese PC, en `%APPDATA%\ClutchReel\config.json`; el repositorio no contiene contraseñas, SteamIDs ni rutas.
-4. En **Ajustes → OBS** pulsa **«Configurar OBS automáticamente»**: activa el servidor WebSocket de OBS con una contraseña nueva, la guarda en ClutchReel y reabre OBS (avisa antes de cerrarlo).
-5. Con un proyecto abierto, **Ajustes → Probar grabación (calibrar)** para medir la latencia de ese PC.
-
-Para actualizar más adelante, ver «Actualizar».
-
 ## Actualizar
 
 Las novedades de cada versión están en [`CHANGELOG.md`](CHANGELOG.md).
+
+Si instalaste con Git (forma A):
 
 1. Cierra ClutchReel.
 2. Haz **doble clic en `Actualizar.bat`**. Descarga la última versión (`git fetch` + `git pull --ff-only`), instala o quita las dependencias que hayan cambiado y muestra la versión instalada.
@@ -154,7 +147,7 @@ Tema oscuro grafito con un único acento naranja. Cada tipo de jugada tiene su c
 - **YouTube**, **Modo automático**, **Apariencia** (tema oscuro/claro, bandeja).
 - Botones **Diagnóstico** (Python, FFmpeg, codificador, Steam, CS2, demos, OBS, WebSocket, jugador, disco, vista previa, con solución para cada fallo) y **Ver registro** → «Copiar informe de errores».
 
-Rendimiento: el análisis lee la demo en una sola pasada y guarda el resultado en `%APPDATA%\ClutchReel\cachenalisis` (volver a analizar la misma demo, aunque esté copiada en otra carpeta, es instantáneo). Al terminar de grabar, ClutchReel se pone delante de CS2: con CS2 en primer plano y la demo en pausa, el juego ocupa toda la GPU y la exportación iba hasta 15 veces más lenta.
+Rendimiento: el análisis lee la demo en una sola pasada y guarda el resultado en `%APPDATA%\ClutchReel\cache\analisis` (volver a analizar la misma demo, aunque esté copiada en otra carpeta, es instantáneo). Al terminar de grabar, ClutchReel se pone delante de CS2: con CS2 en primer plano y la demo en pausa, el juego ocupa toda la GPU y la exportación iba hasta 15 veces más lenta.
 
 La configuración está en `%APPDATA%\ClutchReel\config.json`; los proyectos en `%APPDATA%\ClutchReel\proyectos`; el registro rotativo en `%APPDATA%\ClutchReel\logs\clutchreel.log`. Los vídeos salen en `Vídeos\ClutchReel` (grabaciones en bruto en `Vídeos\ClutchReel\grabaciones`).
 

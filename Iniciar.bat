@@ -9,9 +9,10 @@ echo   ClutchReel - demos de CS2 a highlights
 echo ==========================================
 echo.
 
-rem ---------- 1) Python 3.11+ ----------
+rem ---------- 1) Python 3.12+ ----------
+rem (las dependencias fijadas, p. ej. numpy 2.5, ya no se publican para Python 3.11)
 set "PY="
-for %%V in (3.13 3.12 3.11 3.14) do (
+for %%V in (3.12 3.13 3.14) do (
     if not defined PY (
         py -%%V -c "import sys" >nul 2>&1 && set "PY=py -%%V"
     )
@@ -19,12 +20,12 @@ for %%V in (3.13 3.12 3.11 3.14) do (
 if not defined PY (
     for /f "delims=" %%P in ('where python 2^>nul') do (
         if not defined PY (
-            "%%P" -c "import sys; raise SystemExit(0 if sys.version_info >= (3,11) else 1)" >nul 2>&1 && set "PY=%%P"
+            "%%P" -c "import sys; raise SystemExit(0 if sys.version_info >= (3,12) else 1)" >nul 2>&1 && set "PY=%%P"
         )
     )
 )
 if not defined PY (
-    echo [X] No se encontro Python 3.11 o superior.
+    echo [X] No se encontro Python 3.12 o superior.
     echo.
     echo     Opcion A: instalarlo con winget ^(recomendado^):
     echo         winget install --id Python.Python.3.12 -e --source winget

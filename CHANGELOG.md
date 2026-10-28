@@ -2,6 +2,14 @@
 
 Formato: versión, fecha y cambios agrupados. Cómo actualizar: sección «Actualizar» del `README.md`.
 
+## Sin publicar
+
+- **Python 3.12 o superior.** Las dependencias fijadas (numpy 2.5) no existen para Python 3.11 y la
+  instalación fallaba; `Iniciar.bat`, el README y `pyproject.toml` lo exigen ahora.
+- README para el repositorio público: instalación con Git o descargando el ZIP, aviso de que FFmpeg
+  es un programa aparte (GPL-3.0) que se descarga de gyan.dev, y una ruta mal escrita corregida.
+- `pyproject.toml` declara la licencia MIT y el autor.
+
 ## 1.1.0 — 2026-10-27
 
 Probado en Windows 11 con CS2 1.41.9, OBS 33.0.0 (obs-websocket 5.7.6) y una GPU RTX 4060 Ti:
