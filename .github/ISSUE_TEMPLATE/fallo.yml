@@ -1,0 +1,43 @@
+name: Avisar de un fallo
+description: Algo no funciona como debería.
+labels: ["fallo"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Gracias por avisar. Antes de pegar registros o informes, **revísalos**: pueden incluir nombres de jugadores de tus demos y rutas de tu PC (por ejemplo `C:\Users\tu-nombre`). Tacha lo que no quieras publicar.
+        Si es un fallo de seguridad, no lo publiques aquí: sigue `SECURITY.md`.
+  - type: textarea
+    id: que-paso
+    attributes:
+      label: Qué pasó
+      description: Qué hiciste, qué esperabas y qué ocurrió. Copia el mensaje de error exacto si lo hay.
+    validations:
+      required: true
+  - type: textarea
+    id: pasos
+    attributes:
+      label: Cómo reproducirlo
+      placeholder: |
+        1. Arrastro la demo…
+        2. En el asistente elijo…
+        3. Al pulsar «Crear vídeo»…
+  - type: input
+    id: version
+    attributes:
+      label: Versión de ClutchReel
+      description: Aparece abajo a la izquierda en la app.
+      placeholder: "1.1.0"
+    validations:
+      required: true
+  - type: input
+    id: entorno
+    attributes:
+      label: Windows, OBS y CS2
+      placeholder: "Windows 11 24H2, OBS 33.0, CS2 1.41.9"
+  - type: textarea
+    id: informe
+    attributes:
+      label: Informe de errores
+      description: "Ajustes → Ver registro → Copiar informe de errores. Revisa y tacha datos personales antes de pegarlo."
+      render: text

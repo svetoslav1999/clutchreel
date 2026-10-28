@@ -1,0 +1,16 @@
+name: Proponer una idea
+description: Una mejora o algo nuevo que te gustaría ver en ClutchReel.
+labels: ["idea"]
+body:
+  - type: textarea
+    id: problema
+    attributes:
+      label: Qué te gustaría conseguir
+      description: Cuéntalo desde tu uso (por ejemplo, «quiero que los Shorts lleven…»), no hace falta proponer la solución técnica.
+    validations:
+      required: true
+  - type: textarea
+    id: alternativas
+    attributes:
+      label: Cómo lo haces ahora
+      description: Si hoy lo resuelves de otra forma, cuéntala.

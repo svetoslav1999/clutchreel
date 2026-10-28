@@ -169,6 +169,7 @@ class HomePage(QWidget):
             child = self.history_layout.takeAt(0)
             widget = child.widget() if child is not None else None
             if widget is not None:
+                widget.hide()  # deleteLater no lo quita hasta el siguiente ciclo: sin esto se veía encima de las nuevas
                 widget.deleteLater()
         for e in self.state.history.entries[:15]:
             when = time.strftime("%d/%m/%Y %H:%M", time.localtime(e.processed_at))

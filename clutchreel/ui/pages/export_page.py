@@ -86,6 +86,7 @@ class ExportPage(QWidget):
         self.tbl.setSelectionBehavior(QTableWidget.SelectionBehavior.SelectRows)
         self.tbl.setEditTriggers(QTableWidget.EditTrigger.NoEditTriggers)
         self.tbl.setMaximumHeight(200)
+        self.tbl.setMinimumHeight(134)  # cabecera + 3 trabajos; sin mínimo se aplastaba al mostrar un resultado
         root.addWidget(self.tbl)
         tools = QHBoxLayout()
         btn_clear = QPushButton("Limpiar terminados")

@@ -9,6 +9,11 @@ Formato: versión, fecha y cambios agrupados. Cómo actualizar: sección «Actua
 - README para el repositorio público: instalación con Git o descargando el ZIP, aviso de que FFmpeg
   es un programa aparte (GPL-3.0) que se descarga de gyan.dev, y una ruta mal escrita corregida.
 - `pyproject.toml` declara la licencia MIT y el autor.
+- README nuevo para el repositorio público: qué es y para qué sirve, capturas, recorrido animado,
+  diagrama del proceso, tipos de jugada con su color, guía paso a paso y preguntas frecuentes.
+  Guías `CONTRIBUTING.md` y `SECURITY.md`, y plantillas de issue que piden tachar datos personales.
+- Inicio: al refrescar, el historial ya no muestra un instante las líneas antiguas encima de las nuevas.
+- Cola: la tabla de trabajos ya no se aplasta cuando se muestra el último vídeo creado.
 
 ## 1.1.0 — 2026-10-27
 
