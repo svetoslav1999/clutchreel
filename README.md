@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="docs/img/banner.png" alt="ClutchReel: la partida como una línea de tiempo; las mejores jugadas (2K, ACE, 3K, clutch, wallbang, humo, no-scope) pasan de la demo al vídeo final montado" width="100%">
+  <img src="docs/img/social-preview.png" alt="ClutchReel: Turn your CS2 demos into highlight videos. Sueltas la demo, OBS graba tus mejores rondas y sale highlights.mp4 listo para YouTube" width="100%">
 </p>
 
 <p align="center">
