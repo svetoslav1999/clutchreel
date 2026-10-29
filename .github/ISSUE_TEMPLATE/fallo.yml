@@ -27,7 +27,7 @@ body:
     attributes:
       label: Versión de ClutchReel
       description: Aparece abajo a la izquierda en la app.
-      placeholder: "1.1.0"
+      placeholder: "1.1.1"
     validations:
       required: true
   - type: input

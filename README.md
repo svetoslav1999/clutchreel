@@ -404,7 +404,7 @@ Si instalaste con Git (forma A):
 
 ClutchReel no está terminado: sigo trabajando en él y cada versión nueva llega a la página de [Releases](https://github.com/svetoslav1999/clutchreel/releases) con sus cambios en [`CHANGELOG.md`](CHANGELOG.md).
 
-**Ya disponible (1.1.0):** 17 tipos de jugada, grabación automática con comprobación de cámara, montaje completo con música y miniatura, formato vertical para Shorts, modo todo automático y subida a YouTube.
+**Ya disponible (1.1.1):** 17 tipos de jugada, grabación automática con comprobación de cámara, montaje completo con música y miniatura, formato vertical para Shorts, modo todo automático y subida a YouTube.
 
 **Lo próximo que quiero hacer** (ideas, sin fecha; el orden puede cambiar según lo que pidáis):
 

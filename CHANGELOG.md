@@ -2,7 +2,7 @@
 
 Formato: versión, fecha y cambios agrupados. Cómo actualizar: sección «Actualizar» del `README.md`.
 
-## Sin publicar
+## 1.1.1 — 2026-10-29
 
 - **Python 3.12 o superior.** Las dependencias fijadas (numpy 2.5) no existen para Python 3.11 y la
   instalación fallaba; `Iniciar.bat`, el README y `pyproject.toml` lo exigen ahora.
