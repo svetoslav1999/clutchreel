@@ -14,6 +14,8 @@ Formato: versión, fecha y cambios agrupados. Cómo actualizar: sección «Actua
   Guías `CONTRIBUTING.md` y `SECURITY.md`, y plantillas de issue que piden tachar datos personales.
 - Inicio: al refrescar, el historial ya no muestra un instante las líneas antiguas encima de las nuevas.
 - Cola: la tabla de trabajos ya no se aplasta cuando se muestra el último vídeo creado.
+- README: apartado «En desarrollo activo» con lo próximo y cómo seguir el proyecto; aviso de que
+  la descarga de FFmpeg puede tardar varios minutos.
 
 ## 1.1.0 — 2026-10-27
 
