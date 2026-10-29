@@ -8,6 +8,7 @@
   <img alt="Counter-Strike 2" src="https://img.shields.io/badge/Counter--Strike%202-demos-ff9f1c?style=flat-square&labelColor=111318">
   <img alt="OBS Studio 28+" src="https://img.shields.io/badge/OBS%20Studio-28%2B-20242d?style=flat-square&labelColor=111318">
   <img alt="Licencia MIT" src="https://img.shields.io/badge/licencia-MIT-3dd68c?style=flat-square&labelColor=111318">
+  <a href="#en-desarrollo-activo"><img alt="En desarrollo activo" src="https://img.shields.io/badge/estado-en%20desarrollo%20activo-ff9f1c?style=flat-square&labelColor=111318"></a>
 </p>
 
 <p align="center">
@@ -15,16 +16,20 @@
   <a href="#tu-primer-vídeo-paso-a-paso">Guía paso a paso</a> ·
   <a href="#cómo-funciona">Cómo funciona</a> ·
   <a href="#preguntas-frecuentes">Preguntas frecuentes</a> ·
-  <a href="#solución-de-problemas">Problemas</a>
+  <a href="#solución-de-problemas">Problemas</a> ·
+  <a href="#en-desarrollo-activo">Lo que viene</a>
 </p>
 
 **ClutchReel** convierte la demo de una partida de **Counter-Strike 2** en un vídeo con tus mejores jugadas, listo para YouTube o para Shorts. Arrastras la demo, contestas cinco preguntas (o pulsas «Usar recomendado») y el programa hace el resto: encuentra tus ACE, clutches y multikills, los graba desde el visor oficial de demos con OBS y monta el vídeo con intro, cámara lenta, marcador de kills, música y miniatura.
 
-> **In English:** ClutchReel turns a Counter-Strike 2 match demo into a highlights video. It parses the `.dem` file, finds and scores your best plays (aces, clutches, multi-kills, wallbangs…), records each one from the official in-game demo viewer through OBS, checking that the camera is really on your player, and edits the final video with FFmpeg (intro, slow motion, kill counter, music, thumbnail, YouTube metadata). Windows only; the interface is in Spanish.
+> **In English:** ClutchReel is a free, open-source CS2 highlights maker: it turns a Counter-Strike 2 match demo into a highlights video (frag movie, YouTube video or Short). It parses the `.dem` file, finds and scores your best plays (aces, clutches, multi-kills, wallbangs…), records each one from the official in-game demo viewer through OBS, checking that the camera is really on your player, and edits the final video with FFmpeg (intro, slow motion, kill counter, music, thumbnail, YouTube metadata). Windows only; the interface is in Spanish.
 
 <p align="center">
   <img src="docs/img/recorrido.gif" alt="Recorrido por la aplicación: Inicio, asistente, revisión de jugadas y cola de trabajos" width="88%">
 </p>
+
+> [!TIP]
+> **ClutchReel está en desarrollo activo** y sigue mejorando con cada versión. Mira [lo que viene](#en-desarrollo-activo), dale una ⭐ si te sirve y pulsa **Watch → Custom → Releases** para enterarte de cada versión nueva. ¿Se te ocurre una jugada que debería detectar o algo que falla con tus demos? [Cuéntalo aquí](https://github.com/svetoslav1999/clutchreel/issues/new/choose).
 
 ---
 
@@ -171,7 +176,7 @@ Con esta forma `Actualizar.bat` no funciona: para actualizar, descarga el ZIP nu
 1. Haz **doble clic en `Iniciar.bat`**. La primera vez:
    - comprueba que tienes Python 3.12 o superior (si falta, te ofrece instalarlo con winget);
    - crea el entorno virtual `.venv` e instala las dependencias (versiones fijadas en `requirements.txt`);
-   - comprueba FFmpeg y, si falta, lo descarga (ver «Sobre FFmpeg», ~90 MB);
+   - comprueba FFmpeg y, si falta, lo descarga (ver «Sobre FFmpeg»; unos 100 MB, y según el servidor de gyan.dev puede tardar varios minutos);
    - abre ClutchReel. Tarda unos minutos solo la primera vez; las siguientes arranca directamente.
 2. Se abre la **primera configuración**: muestra lo detectado (Steam, CS2, OBS, FFmpeg, demos) y toma tu cuenta de Steam como jugador. Tu configuración se guarda solo en tu PC, en `%APPDATA%\ClutchReel\config.json`; el repositorio no contiene contraseñas, SteamIDs ni rutas.
 3. En **Ajustes → OBS** pulsa **«Configurar OBS automáticamente»**: activa el servidor WebSocket de OBS con una contraseña nueva, la guarda en ClutchReel y reabre OBS (avisa antes de cerrarlo).
@@ -392,6 +397,29 @@ Si instalaste con Git (forma A):
 `Actualizar.bat` nunca descarta cambios locales: si has modificado algún archivo de ClutchReel, se detiene y te indica cómo guardarlo (`git stash`). Si tu copia y la de GitHub tienen historiales distintos, muestra el comando para dejarla igual que la de GitHub. Tu configuración (`%APPDATA%\ClutchReel`) no está en el repositorio y no se toca al actualizar.
 
 `Iniciar.bat` también comprueba las dependencias en cada arranque: si el contenido de `requirements.txt` cambió, las reinstala y desinstala las que ya no se usan.
+
+---
+
+## En desarrollo activo
+
+ClutchReel no está terminado: sigo trabajando en él y cada versión nueva llega a la página de [Releases](https://github.com/svetoslav1999/clutchreel/releases) con sus cambios en [`CHANGELOG.md`](CHANGELOG.md).
+
+**Ya disponible (1.1.0):** 17 tipos de jugada, grabación automática con comprobación de cámara, montaje completo con música y miniatura, formato vertical para Shorts, modo todo automático y subida a YouTube.
+
+**Lo próximo que quiero hacer** (ideas, sin fecha; el orden puede cambiar según lo que pidáis):
+
+- [ ] Interfaz en inglés.
+- [ ] Instalador `.exe` en Releases, para usarlo sin instalar Python.
+- [ ] Más tipos de jugada y una puntuación ajustable a tu gusto.
+- [ ] Más estilos de intro, textos y transiciones.
+- [ ] Probar y documentar demos de otras plataformas (FACEIT y similares).
+
+**Cómo seguir el proyecto o ayudar:**
+
+- ⭐ Dale una estrella: ayuda a que más jugadores de CS2 lo encuentren.
+- 👀 **Watch → Custom → Releases** para recibir un aviso con cada versión.
+- 💡 [Propón una idea](https://github.com/svetoslav1999/clutchreel/issues/new?template=idea.yml) o [avisa de un fallo](https://github.com/svetoslav1999/clutchreel/issues/new?template=fallo.yml).
+- 💬 Comenta y comparte tus vídeos en [Discussions](https://github.com/svetoslav1999/clutchreel/discussions).
 
 ---
 
