@@ -12,6 +12,11 @@
 </p>
 
 <p align="center">
+  <a href="https://github.com/svetoslav1999/clutchreel/releases/latest"><img alt="Descargar la última versión" src="https://img.shields.io/badge/Descargar-%C3%BAltima%20versi%C3%B3n-ff9f1c?style=for-the-badge&labelColor=111318"></a>
+  <a href="#tu-primer-vídeo-paso-a-paso"><img alt="Guía paso a paso" src="https://img.shields.io/badge/Gu%C3%ADa-paso%20a%20paso-20242d?style=for-the-badge&labelColor=111318"></a>
+</p>
+
+<p align="center">
   <a href="#instalación">Instalación</a> ·
   <a href="#tu-primer-vídeo-paso-a-paso">Guía paso a paso</a> ·
   <a href="#cómo-funciona">Cómo funciona</a> ·
@@ -166,7 +171,7 @@ Hay dos formas. La primera es la recomendada porque permite actualizar con un do
 
 **B. Sin Git**
 
-1. En la página del repositorio pulsa **Code → Download ZIP**.
+1. En la [última versión](https://github.com/svetoslav1999/clutchreel/releases/latest) descarga **Source code (zip)**, o en la página del repositorio pulsa **Code → Download ZIP**.
 2. Descomprime el ZIP donde quieras.
 
 Con esta forma `Actualizar.bat` no funciona: para actualizar, descarga el ZIP nuevo y sustituye la carpeta (tu configuración está en `%APPDATA%\ClutchReel` y no se pierde).
@@ -445,3 +450,10 @@ ClutchReel es software libre bajo la **licencia MIT** (ver [`LICENSE`](LICENSE))
 **Proyecto independiente.** ClutchReel no está afiliado, patrocinado ni aprobado por Valve Corporation ni por el proyecto OBS Studio. Counter-Strike, Counter-Strike 2 y Steam son marcas de Valve Corporation; OBS y OBS Studio pertenecen a sus respectivos titulares. Los nombres se usan solo para indicar con qué programas funciona.
 
 **Sin garantías.** El software se ofrece «tal cual», sin garantía de ningún tipo, expresa o implícita. Úsalo bajo tu responsabilidad; los autores no responden de daños, pérdidas de datos ni de las consecuencias de su uso (ver `LICENSE`).
+
+---
+
+<p align="center">
+  Hecho por <a href="https://github.com/svetoslav1999"><b>Svetoslav Filipov</b></a> · <a href="https://k1n-portfolio.vercel.app">K1N Solutions</a><br>
+  <sub>Un regalo a la comunidad de Counter-Strike: gratis, de código abierto y sin anuncios.</sub>
+</p>
